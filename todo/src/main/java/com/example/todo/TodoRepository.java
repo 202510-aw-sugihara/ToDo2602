@@ -20,6 +20,9 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
   // 優先度でソート
   List<Todo> findAllByOrderByPriorityAsc();
 
+  // 作成日時の新しい順でソート
+  List<Todo> findAllByOrderByCreatedAtDesc();
+
   // @Queryアノテーションの例（完了状態 + タイトル部分一致）
   @Query("select t from Todo t where t.completed = :completed and t.title like %:keyword%")
   List<Todo> searchByStatusAndTitle(@Param("completed") boolean completed,

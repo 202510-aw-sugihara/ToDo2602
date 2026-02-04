@@ -15,7 +15,7 @@ public class TodoService {
   }
 
   public List<Todo> findAll() {
-    return todoRepository.findAllByOrderByPriorityAsc();
+    return todoRepository.findAllByOrderByCreatedAtDesc();
   }
 
   public Optional<Todo> findById(long id) {
