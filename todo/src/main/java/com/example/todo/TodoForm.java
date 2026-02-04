@@ -36,6 +36,8 @@ public class TodoForm {
   @NotNull(message = "優先度は必須です。")
   private Priority priority;
 
+  private Long categoryId;
+
   private Boolean completed;
 
   private Long version;

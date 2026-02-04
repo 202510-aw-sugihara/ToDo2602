@@ -13,25 +13,30 @@ public class TodoService {
 
   private final TodoRepository todoRepository;
   private final TodoMapper todoMapper;
+  private final CategoryRepository categoryRepository;
 
-  public TodoService(TodoRepository todoRepository, TodoMapper todoMapper) {
+  public TodoService(TodoRepository todoRepository, TodoMapper todoMapper,
+      CategoryRepository categoryRepository) {
     this.todoRepository = todoRepository;
     this.todoMapper = todoMapper;
+    this.categoryRepository = categoryRepository;
   }
 
   public List<Todo> findAll() {
     return todoRepository.findAllByOrderByCreatedAtDesc();
   }
 
-  public Page<Todo> findPage(String keyword, String sort, String direction, Pageable pageable) {
+  public Page<Todo> findPage(String keyword, String sort, String direction, Long categoryId,
+      Pageable pageable) {
     String safeSort = (sort == null || sort.isBlank()) ? "createdAt" : sort;
     String safeDirection = (direction == null || direction.isBlank()) ? "desc" : direction;
     String safeKeyword = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
-    long total = todoMapper.count(safeKeyword);
+    long total = todoMapper.count(safeKeyword, categoryId);
     List<Todo> content = todoMapper.search(
         safeKeyword,
         safeSort,
         safeDirection,
+        categoryId,
         pageable.getPageSize(),
         (int) pageable.getOffset()
     );
@@ -50,6 +55,7 @@ public class TodoService {
         todo.getDescription(),
         todo.getDueDate(),
         todo.getPriority(),
+        todo.getCategory() != null ? todo.getCategory().getId() : null,
         todo.getCompleted(),
         todo.getVersion()
     );
@@ -70,6 +76,7 @@ public class TodoService {
     todo.setDescription(form.getDetail());
     todo.setDueDate(form.getDueDate());
     todo.setPriority(form.getPriority() != null ? form.getPriority() : Priority.MEDIUM);
+    todo.setCategory(resolveCategory(form.getCategoryId()));
     todo.setCompleted(Boolean.TRUE.equals(form.getCompleted()));
     todo.setVersion(form.getVersion());
     return todoRepository.save(todo);
@@ -100,7 +107,15 @@ public class TodoService {
         .description(form.getDetail())
         .dueDate(form.getDueDate())
         .priority(form.getPriority() != null ? form.getPriority() : Priority.MEDIUM)
+        .category(resolveCategory(form.getCategoryId()))
         .completed(false)
         .build();
+  }
+
+  private Category resolveCategory(Long categoryId) {
+    if (categoryId == null) {
+      return null;
+    }
+    return categoryRepository.findById(categoryId).orElse(null);
   }
 }

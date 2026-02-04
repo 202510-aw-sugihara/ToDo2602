@@ -7,6 +7,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
@@ -44,6 +46,10 @@ public class Todo {
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 10)
   private Priority priority = Priority.MEDIUM;
+
+  @ManyToOne
+  @JoinColumn(name = "category_id")
+  private Category category;
 
   @Column(nullable = false)
   private Boolean completed = false;

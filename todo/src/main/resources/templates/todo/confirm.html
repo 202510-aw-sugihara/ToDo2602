@@ -32,6 +32,8 @@
             <dd class="col-sm-9" th:text="${todoForm.dueDate}">2026-02-04</dd>
             <dt class="col-sm-3">優先度</dt>
             <dd class="col-sm-9" th:text="${todoForm.priority != null ? todoForm.priority.label : '-'}">中</dd>
+            <dt class="col-sm-3">カテゴリ</dt>
+            <dd class="col-sm-9" th:text="${todoForm.categoryId}">-</dd>
           </dl>
           <div class="d-flex gap-2">
             <form th:action="@{/todos/back}" th:object="${todoForm}" method="post">
@@ -40,6 +42,7 @@
               <input type="hidden" th:field="*{detail}" />
               <input type="hidden" th:field="*{dueDate}" />
               <input type="hidden" th:field="*{priority}" />
+              <input type="hidden" th:field="*{categoryId}" />
               <button class="btn btn-outline-secondary" type="submit">入力に戻る</button>
             </form>
             <form th:action="@{/todos/complete}" th:object="${todoForm}" method="post">
@@ -48,6 +51,7 @@
               <input type="hidden" th:field="*{detail}" />
               <input type="hidden" th:field="*{dueDate}" />
               <input type="hidden" th:field="*{priority}" />
+              <input type="hidden" th:field="*{categoryId}" />
               <button class="btn btn-primary" type="submit">登録</button>
             </form>
           </div>

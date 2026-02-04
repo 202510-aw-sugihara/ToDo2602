@@ -20,6 +20,9 @@
       <if test="keyword != null and keyword != ''">
         AND title LIKE CONCAT('%', #{keyword}, '%')
       </if>
+      <if test="categoryId != null">
+        AND category_id = #{categoryId}
+      </if>
     </where>
     <choose>
       <when test="sort == 'createdAt'">ORDER BY created_at</when>
@@ -40,6 +43,9 @@
     <where>
       <if test="keyword != null and keyword != ''">
         AND title LIKE CONCAT('%', #{keyword}, '%')
+      </if>
+      <if test="categoryId != null">
+        AND category_id = #{categoryId}
       </if>
     </where>
   </select>
