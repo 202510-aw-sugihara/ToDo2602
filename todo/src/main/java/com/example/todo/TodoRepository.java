@@ -27,4 +27,8 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
   @Query("select t from Todo t where t.completed = :completed and t.title like %:keyword%")
   List<Todo> searchByStatusAndTitle(@Param("completed") boolean completed,
       @Param("keyword") String keyword);
+
+  // タイトルでLIKE検索
+  @Query("select t from Todo t where t.title like %:keyword%")
+  List<Todo> searchByTitle(@Param("keyword") String keyword);
 }

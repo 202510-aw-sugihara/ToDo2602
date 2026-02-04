@@ -18,6 +18,13 @@ public class TodoService {
     return todoRepository.findAllByOrderByCreatedAtDesc();
   }
 
+  public List<Todo> findAll(String keyword) {
+    if (keyword == null || keyword.isBlank()) {
+      return findAll();
+    }
+    return todoRepository.searchByTitle(keyword.trim());
+  }
+
   public Optional<Todo> findById(long id) {
     return todoRepository.findById(id);
   }

@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -27,9 +28,11 @@ public class TodoController {
 
   // ToDo一覧画面を表示します。
   @GetMapping("/todos")
-  public String list(Model model) {
-    List<Todo> todos = todoService.findAll();
+  public String list(@RequestParam(required = false) String keyword, Model model) {
+    List<Todo> todos = todoService.findAll(keyword);
     model.addAttribute("todos", todos);
+    model.addAttribute("keyword", keyword == null ? "" : keyword);
+    model.addAttribute("resultCount", todos.size());
     return "index";
   }
 

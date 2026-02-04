@@ -31,6 +31,27 @@
         <div class="card-body">
           <h2 class="h5 mb-3">一覧</h2>
 
+          <form class="row g-2 align-items-center mb-3" method="get" th:action="@{/todos}">
+            <div class="col-sm-6 col-md-4">
+              <input
+                class="form-control"
+                type="text"
+                name="keyword"
+                placeholder="タイトルで検索"
+                th:value="${keyword}"
+              />
+            </div>
+            <div class="col-auto">
+              <button class="btn btn-outline-primary" type="submit">検索</button>
+            </div>
+            <div class="col-auto" th:if="${keyword != null and !#strings.isEmpty(keyword)}">
+              <a class="btn btn-outline-secondary" th:href="@{/todos}">クリア</a>
+            </div>
+            <div class="col-12">
+              <small class="text-muted" th:text="'検索結果: ' + ${resultCount} + '件'">検索結果: 0件</small>
+            </div>
+          </form>
+
           <div th:if="${todos == null or #lists.isEmpty(todos)}" class="text-center py-5">
             <p class="mb-1 fw-semibold">ToDoがまだ登録されていません</p>
             <p class="text-muted mb-4">最初のToDoを作成してみましょう。</p>
