@@ -31,5 +31,16 @@
       <when test="direction == 'asc'">ASC</when>
       <otherwise>DESC</otherwise>
     </choose>
+    LIMIT #{limit} OFFSET #{offset}
+  </select>
+
+  <select id="count" parameterType="map" resultType="long">
+    SELECT COUNT(*)
+    FROM todos
+    <where>
+      <if test="keyword != null and keyword != ''">
+        AND title LIKE CONCAT('%', #{keyword}, '%')
+      </if>
+    </where>
   </select>
 </mapper>

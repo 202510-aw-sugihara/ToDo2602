@@ -3,6 +3,9 @@ package com.example.todo;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -32,13 +35,21 @@ public class TodoController {
   public String list(@RequestParam(required = false) String keyword,
       @RequestParam(required = false) String sort,
       @RequestParam(required = false) String direction,
+      @PageableDefault(size = 10) Pageable pageable,
       Model model) {
-    List<Todo> todos = todoService.findAll(keyword, sort, direction);
+    Page<Todo> page = todoService.findPage(keyword, sort, direction, pageable);
+    List<Todo> todos = page.getContent();
     model.addAttribute("todos", todos);
+    model.addAttribute("page", page);
     model.addAttribute("keyword", keyword == null ? "" : keyword);
     model.addAttribute("sort", sort == null ? "createdAt" : sort);
     model.addAttribute("direction", direction == null ? "desc" : direction);
-    model.addAttribute("resultCount", todos.size());
+    model.addAttribute("resultCount", page.getTotalElements());
+    long total = page.getTotalElements();
+    long start = total == 0 ? 0 : (page.getNumber() * page.getSize()) + 1;
+    long end = total == 0 ? 0 : Math.min(start + page.getSize() - 1, total);
+    model.addAttribute("start", start);
+    model.addAttribute("end", end);
     return "index";
   }
 

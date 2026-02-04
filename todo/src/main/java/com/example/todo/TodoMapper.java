@@ -9,5 +9,9 @@ public interface TodoMapper {
 
   List<Todo> search(@Param("keyword") String keyword,
       @Param("sort") String sort,
-      @Param("direction") String direction);
+      @Param("direction") String direction,
+      @Param("limit") int limit,
+      @Param("offset") int offset);
+
+  long count(@Param("keyword") String keyword);
 }

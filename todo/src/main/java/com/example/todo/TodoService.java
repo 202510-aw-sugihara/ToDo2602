@@ -4,6 +4,9 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 
 @Service
 public class TodoService {
@@ -20,11 +23,19 @@ public class TodoService {
     return todoRepository.findAllByOrderByCreatedAtDesc();
   }
 
-  public List<Todo> findAll(String keyword, String sort, String direction) {
+  public Page<Todo> findPage(String keyword, String sort, String direction, Pageable pageable) {
     String safeSort = (sort == null || sort.isBlank()) ? "createdAt" : sort;
     String safeDirection = (direction == null || direction.isBlank()) ? "desc" : direction;
     String safeKeyword = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
-    return todoMapper.search(safeKeyword, safeSort, safeDirection);
+    long total = todoMapper.count(safeKeyword);
+    List<Todo> content = todoMapper.search(
+        safeKeyword,
+        safeSort,
+        safeDirection,
+        pageable.getPageSize(),
+        (int) pageable.getOffset()
+    );
+    return new PageImpl<>(content, pageable, total);
   }
 
   public Optional<Todo> findById(long id) {
