@@ -65,4 +65,8 @@ public class Todo {
   public void onUpdate() {
     updatedAt = LocalDateTime.now();
   }
+
+  public boolean isCompleted() {
+    return Boolean.TRUE.equals(completed);
+  }
 }

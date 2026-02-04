@@ -40,5 +40,7 @@ public class TodoForm {
   @Max(value = 5, message = "優先度は5以下を指定してください。")
   private Integer priority;
 
+  private Boolean completed;
+
   private Long version;
 }

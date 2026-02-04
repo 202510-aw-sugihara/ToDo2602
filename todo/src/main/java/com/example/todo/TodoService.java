@@ -30,6 +30,7 @@ public class TodoService {
         todo.getDescription(),
         todo.getDueDate(),
         todo.getPriority(),
+        todo.getCompleted(),
         todo.getVersion()
     );
   }
@@ -49,6 +50,7 @@ public class TodoService {
     todo.setDescription(form.getDetail());
     todo.setDueDate(form.getDueDate());
     todo.setPriority(form.getPriority());
+    todo.setCompleted(Boolean.TRUE.equals(form.getCompleted()));
     todo.setVersion(form.getVersion());
     return todoRepository.save(todo);
   }

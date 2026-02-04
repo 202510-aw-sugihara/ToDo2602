@@ -30,7 +30,7 @@ public class TodoController {
   public String list(Model model) {
     List<Todo> todos = todoService.findAll();
     model.addAttribute("todos", todos);
-    return "todo/list";
+    return "index";
   }
 
   // ToDo新規作成画面を表示します。
@@ -138,5 +138,17 @@ public class TodoController {
       redirectAttributes.addFlashAttribute("errorMessage", "対象のToDoが見つかりませんでした。");
       return "redirect:/todos";
     }
+  }
+
+  // 一覧画面の切り替えボタン用（非Ajax）
+  @PostMapping("/{id}/toggle")
+  public String toggleFromIndex(@PathVariable("id") long id, RedirectAttributes redirectAttributes) {
+    try {
+      todoService.toggleCompleted(id);
+      redirectAttributes.addFlashAttribute("successMessage", "完了状態を更新しました。");
+    } catch (IllegalArgumentException ex) {
+      redirectAttributes.addFlashAttribute("errorMessage", "対象のToDoが見つかりませんでした。");
+    }
+    return "redirect:/todos";
   }
 }
