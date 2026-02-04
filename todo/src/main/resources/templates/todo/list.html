@@ -63,11 +63,14 @@
               <tbody>
                 <tr th:each="todo : ${todos}">
                   <td>
-                    <span data-title
-                          th:classappend="${todo.completed} ? 'text-decoration-line-through text-muted' : ''"
-                          th:text="${todo.title}">
+                    <a
+                      data-title
+                      th:href="@{/todos/{id}(id=${todo.id})}"
+                      th:classappend="${todo.completed} ? 'text-decoration-line-through text-muted' : ''"
+                      th:text="${todo.title}"
+                    >
                       サンプルToDo
-                    </span>
+                    </a>
                   </td>
                   <td
                     th:text="${todo.dueDate != null ? #temporals.format(todo.dueDate, 'yyyy/MM/dd') : '-'}"
@@ -90,7 +93,6 @@
                     </form>
                   </td>
                   <td>
-                    <a class="btn btn-sm btn-outline-primary" th:href="@{/todos/{id}(id=${todo.id})}">詳細</a>
                     <a class="btn btn-sm btn-outline-secondary" th:href="@{/todos/{id}/edit(id=${todo.id})}">編集</a>
                     <form class="d-inline" th:action="@{/todos/{id}/delete(id=${todo.id})}" method="post" onsubmit="return confirm('本当に削除しますか？')">
                       <button class="btn btn-sm btn-outline-danger" type="submit">削除</button>
