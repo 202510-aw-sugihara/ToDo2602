@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="ja">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ToDo詳細</title>
+    <title th:text="#{title.detail}">Todo Detail</title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -13,33 +13,48 @@
   </head>
   <body class="bg-light">
     <header class="border-bottom bg-white">
-      <div class="container py-3">
-        <h1 class="h4 mb-0">ToDo詳細</h1>
-      </div>
+      <div class="container py-3 d-flex align-items-center justify-content-between">
+        <h1 class="h4 mb-0" th:text="#{title.detail}">Todo Detail</h1>
+        <div class="dropdown">
+  <button class="btn btn-outline-secondary dropdown-toggle"
+          type="button"
+          data-bs-toggle="dropdown"
+          aria-expanded="false"
+          th:text="${currentLangLabel}">Language</button>
+  <ul class="dropdown-menu">
+    <li th:each="opt : ${langOptions}">
+      <a class="dropdown-item"
+         th:classappend="${currentLang == opt.code} ? 'active' : ''"
+         th:href="@{?lang={code}(code=${opt.code})}"
+         th:text="${opt.label}">JA</a>
+    </li>
+  </ul>
+</div>
     </header>
 
     <main class="container my-4">
       <div class="card shadow-sm">
         <div class="card-body">
           <dl class="row mb-4">
-            <dt class="col-sm-3">タイトル</dt>
-            <dd class="col-sm-9" th:text="${todo.title}">タイトル</dd>
-            <dt class="col-sm-3">説明</dt>
-            <dd class="col-sm-9" th:text="${todo.description}">説明</dd>
-            <dt class="col-sm-3">期限日</dt>
+            <dt class="col-sm-3" th:text="#{label.title}">Title</dt>
+            <dd class="col-sm-9" th:text="${todo.title}">Title</dd>
+            <dt class="col-sm-3" th:text="#{label.detail}">Detail</dt>
+            <dd class="col-sm-9" th:text="${todo.description}">Detail</dd>
+            <dt class="col-sm-3" th:text="#{label.due_date}">Due</dt>
             <dd class="col-sm-9" th:text="${todo.dueDate}">2026-02-04</dd>
-            <dt class="col-sm-3">優先度</dt>
-            <dd class="col-sm-9" th:text="${todo.priority != null ? todo.priority.label : '-'}">中</dd>
-            <dt class="col-sm-3">完了</dt>
+            <dt class="col-sm-3" th:text="#{label.priority}">Priority</dt>
+            <dd class="col-sm-9"
+                th:text="${todo.priority != null ? #messages.msg('priority.' + todo.priority.name().toLowerCase()) : '-'}">-</dd>
+            <dt class="col-sm-3" th:text="#{label.status}">Status</dt>
             <dd class="col-sm-9">
-              <span th:if="${todo.completed}">完了</span>
-              <span th:unless="${todo.completed}">未完了</span>
+              <span th:if="${todo.completed}" th:text="#{label.completed}">Completed</span>
+              <span th:unless="${todo.completed}" th:text="#{label.not_completed}">Not completed</span>
             </dd>
           </dl>
           <div class="mb-4">
-            <h2 class="h6 mb-3">添付ファイル</h2>
-            <div th:if="${attachments == null or #lists.isEmpty(attachments)}" class="text-muted">
-              添付ファイルはありません。
+            <h2 class="h6 mb-3" th:text="#{label.attachments}">Attachments</h2>
+            <div th:if="${attachments == null or #lists.isEmpty(attachments)}" class="text-muted" th:text="#{msg.no_attachment}">
+              No attachments.
             </div>
             <ul class="list-group mb-3" th:if="${attachments != null and !#lists.isEmpty(attachments)}">
               <li class="list-group-item d-flex justify-content-between align-items-center"
@@ -51,15 +66,15 @@
                           th:attr="data-todo=${todo.id},
                                    data-attachment=${att.id},
                                    data-name=${att.originalFilename}">
-                    プレビュー/ダウンロード
+                    <span th:text="#{btn.preview}">Preview</span>/<span th:text="#{btn.download}">Download</span>
                   </button>
                 </div>
               </li>
             </ul>
           </div>
           <div class="d-flex gap-2">
-            <a class="btn btn-outline-secondary" th:href="@{/todos}">一覧に戻る</a>
-            <a class="btn btn-primary" th:href="@{/todos/{id}/edit(id=${todo.id})}">編集</a>
+            <a class="btn btn-outline-secondary" th:href="@{/todos}" th:text="#{btn.to_list}">Back</a>
+            <a class="btn btn-primary" th:href="@{/todos/{id}/edit(id=${todo.id})}" th:text="#{btn.edit}">Edit</a>
           </div>
         </div>
       </div>
@@ -68,12 +83,12 @@
     <div id="attachment-modal" class="modal-backdrop" style="display: none;">
       <div class="modal-dialog-centered">
         <div class="modal-content p-3">
-          <h5 class="mb-2">添付ファイル</h5>
+          <h5 class="mb-2" th:text="#{label.attachments}">Attachments</h5>
           <p class="mb-3" id="attachment-filename">file</p>
           <div class="d-flex gap-2 justify-content-end">
-            <button type="button" class="btn btn-outline-secondary" id="attachment-cancel">キャンセル</button>
-            <button type="button" class="btn btn-outline-primary" id="attachment-preview">プレビュー</button>
-            <button type="button" class="btn btn-primary" id="attachment-download">ダウンロード</button>
+            <button type="button" class="btn btn-outline-secondary" id="attachment-cancel" th:text="#{btn.cancel}">Cancel</button>
+            <button type="button" class="btn btn-outline-primary" id="attachment-preview" th:text="#{btn.preview}">Preview</button>
+            <button type="button" class="btn btn-primary" id="attachment-download" th:text="#{btn.download}">Download</button>
           </div>
         </div>
       </div>
@@ -150,5 +165,13 @@
         });
       })();
     </script>
+  <script
+  src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+  integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+  crossorigin="anonymous"></script>
   </body>
 </html>
+
+
+
+

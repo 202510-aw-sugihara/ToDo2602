@@ -1,9 +1,9 @@
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+﻿<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" lang="ja">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ToDo一覧</title>
+    <title th:text="#{app.title}">ToDo</title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -14,150 +14,173 @@
   <body class="bg-light">
     <header class="border-bottom bg-white">
       <div class="container py-3 d-flex align-items-center justify-content-between">
-        <h1 class="h4 mb-0">ToDoアプリ</h1>
-        <a class="btn btn-primary" th:href="@{/todos/new}">新規作成</a>
+        <h1 class="h4 mb-0" th:text="#{app.title}">ToDo</h1>
+        <div class="dropdown">
+          <button class="btn btn-outline-secondary btn-sm dropdown-toggle"
+                  type="button"
+                  data-bs-toggle="dropdown"
+                  aria-expanded="false"
+                  th:text="${currentLangLabel}">Language</button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li th:each="opt : ${langOptions}">
+              <a class="dropdown-item"
+                 th:classappend="${currentLang == opt.code} ? 'active' : ''"
+                 th:href="@{?lang={code}(code=${opt.code})}"
+                 th:text="${opt.label}">JA</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+      <div class="container pb-3">
+        <form class="row g-2 align-items-center justify-content-end" method="get" th:action="@{/todos}">
+          <div class="col-auto">
+            <input
+              class="form-control"
+              type="text"
+              name="keyword"
+              th:placeholder="#{label.search_title}"
+              th:value="${keyword}"
+            />
+          </div>
+          <div class="col-auto">
+            <select class="form-select" name="categoryId">
+              <option value="" th:text="#{label.category}">Category</option>
+              <option th:each="c : ${categories}"
+                      th:value="${c.id}"
+                      th:selected="${categoryId == c.id}"
+                      th:text="${categoryLabels[c.id]}">
+                Category
+              </option>
+            </select>
+          </div>
+          <input type="hidden" name="sort" th:value="${sort}" />
+          <input type="hidden" name="direction" th:value="${direction}" />
+          <div class="col-auto">
+            <button class="btn btn-outline-primary" type="submit" th:text="#{btn.search}">Search</button>
+          </div>
+          <div class="col-auto"
+               th:if="${(keyword != null and !#strings.isEmpty(keyword)) or (categoryId != null)}">
+            <a class="btn btn-outline-secondary" th:href="@{/todos}" th:text="#{btn.clear}">Clear</a>
+          </div>
+        </form>
       </div>
     </header>
 
     <main class="container my-4">
-      <div
-        th:if="${successMessage}"
-        class="alert alert-success alert-dismissible fade show"
-        role="alert"
-        data-auto-dismiss="true"
-        th:text="${successMessage}"
-      >
-        成功しました。
+      <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert" data-auto-dismiss="true" th:text="${successMessage}">
+        OK
       </div>
-      <div
-        th:if="${errorMessage}"
-        class="alert alert-danger alert-dismissible fade show"
-        role="alert"
-        data-auto-dismiss="true"
-        th:text="${errorMessage}"
-      >
-        失敗しました。
+      <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show" role="alert" data-auto-dismiss="true" th:text="${errorMessage}">
+        Error
       </div>
+      <div id="csv-empty-message" class="alert alert-info d-none" role="alert" th:text="#{msg.csv_empty}">
+        No todos
+      </div>
+
       <div class="card shadow-sm">
         <div class="card-body">
-          <h2 class="h5 mb-3">一覧</h2>
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <h2 class="h5 mb-0" th:text="#{title.list}">List</h2>
+            <a class="btn btn-outline-secondary"
+               id="csv-download"
+               th:text="#{btn.csv_download}"
+               th:href="@{/todos/export(keyword=${keyword}, categoryId=${categoryId}, sort=${sort}, direction=${direction})}">
+              CSV Download
+            </a>
+          </div>
+
+          <div class="mb-3">
+            <small class="text-muted" th:text="${#messages.msg('msg.total_range', resultCount, start, end)}">
+              Total 0 / 0-0
+            </small>
+          </div>
 
           <div th:if="${todos == null or #lists.isEmpty(todos)}" class="text-center py-5">
-            <div class="display-6 mb-2">📝</div>
-            <p class="mb-1 fw-semibold">ToDoがまだ登録されていません</p>
-            <p class="text-muted mb-4">最初のToDoを作成してみましょう。</p>
-            <a class="btn btn-primary" th:href="@{/todos/new}">新規作成へ</a>
+            <p class="mb-1 fw-semibold" th:text="#{msg.no_todo}">No todos</p>
+            <p class="text-muted mb-4" th:text="#{msg.no_todo_hint}">Create your first todo.</p>
+            <a class="btn btn-primary" th:href="@{/todos/new}" th:text="#{nav.new}">New</a>
           </div>
 
           <div th:unless="${todos == null or #lists.isEmpty(todos)}" class="table-responsive">
-              <table class="table table-striped align-middle table-layout-fixed">
+            <table class="table table-striped align-middle table-layout-fixed">
               <thead>
                 <tr>
-                  <th style="width: 40px">
-                    <input type="checkbox" id="select-all" />
-                  </th>
-                  <th class="text-nowrap" style="width: 180px">タイトル</th>
-                  <th class="text-nowrap" style="width: 160px">
-                    <a
-                      class="text-decoration-none"
-                      th:href="@{/todos(sort='dueDate', direction=${sort == 'dueDate' and direction == 'asc' ? 'desc' : 'asc'}, keyword=${keyword})}"
-                    >
-                      期限日
-                      <span th:if="${sort == 'dueDate'}" th:text="${direction == 'asc' ? '▲' : '▼'}">▲</span>
+                  <th style="width: 40px"><input type="checkbox" id="select-all" /></th>
+                  <th class="text-nowrap" style="width: 140px">
+                    <a class="text-decoration-none"
+                       th:href="@{/todos(sort='createdAt', direction=${sort == 'createdAt' and direction == 'asc' ? 'desc' : 'asc'}, keyword=${keyword}, categoryId=${categoryId})}"
+                       th:text="#{label.created_at}">
+                      Created
                     </a>
                   </th>
-                  <th class="text-nowrap" style="width: 120px">優先度</th>
-                  <th class="text-nowrap" style="width: 120px">カテゴリ</th>
-                  <th class="text-nowrap" style="width: 120px">完了</th>
-                  <th class="text-nowrap" style="width: 220px">操作</th>
+                  <th class="text-nowrap" style="width: 180px" th:text="#{label.title}">Title</th>
+                  <th class="text-nowrap" style="width: 160px" th:text="#{label.due_date}">Due</th>
+                  <th class="text-nowrap" style="width: 120px" th:text="#{label.priority}">Priority</th>
+                  <th class="text-nowrap" style="width: 120px" th:text="#{label.category}">Category</th>
+                  <th class="text-nowrap" style="width: 120px" th:text="#{label.status}">Status</th>
+                  <th class="text-nowrap" style="width: 200px" th:text="#{label.actions}">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                <tr
-                  th:each="todo : ${todos}"
-                  th:classappend="${
-                    todo.dueDate != null and todo.dueDate.isBefore(T(java.time.LocalDate).now())
-                      ? 'table-danger'
-                      : (todo.dueDate != null and !todo.dueDate.isAfter(T(java.time.LocalDate).now().plusDays(3)))
-                        ? 'table-warning'
-                        : ''
-                  } + (${todo.completed} ? ' table-secondary' : '')"
-                >
+                <tr th:each="todo : ${todos}">
+                  <td><input type="checkbox" name="ids" th:value="${todo.id}" class="row-check" form="bulk-delete-form" /></td>
+                  <td th:text="${todo.createdAt != null ? #temporals.format(todo.createdAt, 'yyyy/MM/dd') : '-'}">2026/02/04</td>
                   <td>
-                    <input type="checkbox" name="ids" th:value="${todo.id}" class="row-check" form="bulk-delete-form" />
-                  </td>
-                  <td>
-                    <a
-                      data-title
-                      class="d-inline-block text-truncate align-middle"
-                      style="max-width: 160px;"
-                      th:href="@{/todos/{id}(id=${todo.id})}"
-                      th:classappend="${todo.completed} ? 'text-decoration-line-through text-muted' : ''"
-                      th:text="${#strings.length(todo.title) > 10 ? #strings.substring(todo.title, 0, 10) + '....' : todo.title}"
-                      th:title="${todo.title}"
-                    >
-                      サンプルToDo
+                    <a class="d-inline-block text-truncate align-middle"
+                       style="max-width: 160px;"
+                       th:href="@{/todos/{id}(id=${todo.id})}"
+                       th:classappend="${todo.completed} ? 'text-decoration-line-through text-muted' : ''"
+                       th:text="${todo.title}"
+                       th:title="${todo.title}">
+                      title
                     </a>
                   </td>
-                  <td
-                    th:text="${todo.dueDate != null ? #temporals.format(todo.dueDate, 'yyyy/MM/dd') : '-'}"
-                    th:classappend="${todo.dueDate != null and todo.dueDate.isBefore(T(java.time.LocalDate).now())} ? 'text-danger' : ''"
-                  >
-                    2026/02/04
+                  <td th:text="${todo.dueDate != null ? #temporals.format(todo.dueDate, 'yyyy/MM/dd') : '-'}">-</td>
+                  <td>
+                    <span th:text="${todo.priority != null ? #messages.msg('priority.' + todo.priority.name().toLowerCase()) : '-'}">-</span>
                   </td>
                   <td>
-                    <span
-                      th:if="${todo.priority != null}"
-                      class="badge"
-                      th:classappend="${todo.priority.cssClass}"
-                      th:text="${todo.priority.label}"
-                    >
-                      中
-                    </span>
-                    <span th:if="${todo.priority == null}">-</span>
+                    <span th:text="${todo.category != null ? categoryLabels[todo.category.id] : '-'}">-</span>
                   </td>
                   <td>
-                    <span th:if="${todo.category != null}" th:text="${todo.category.name}">カテゴリ</span>
-                    <span th:if="${todo.category == null}">-</span>
-                  </td>
-                  <td>
-                    <form class="d-inline" data-ajax="toggle" th:action="@{/todos/{id}/toggle(id=${todo.id})}" method="post">
-                      <input
-                        class="form-check-input"
-                        type="checkbox"
-                        th:checked="${todo.completed}"
-                        onchange="this.form.submit()"
-                      />
+                    <form class="d-inline toggle-form"
+                          th:action="@{/todos/{id}/toggle(id=${todo.id})}"
+                          method="post"
+                          th:attr="data-completed=${todo.completed}">
+                      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                      <button type="submit"
+                              class="btn btn-sm"
+                              th:classappend="${todo.completed} ? 'btn-success' : 'btn-outline-secondary'"
+                              th:text="${todo.completed} ? #{label.completed} : #{label.not_completed}">
+                        Status
+                      </button>
                     </form>
                   </td>
                   <td>
-                    <a class="btn btn-sm btn-outline-secondary" th:href="@{/todos/{id}/edit(id=${todo.id})}">編集</a>
+                    <a class="btn btn-sm btn-outline-secondary" th:href="@{/todos/{id}/edit(id=${todo.id})}" th:text="#{btn.edit}">Edit</a>
                     <form class="d-inline" th:action="@{/todos/{id}(id=${todo.id})}" method="post">
                       <input type="hidden" name="_method" value="DELETE" />
-                      <button
-                        class="btn btn-sm btn-outline-danger"
-                        type="submit"
-                        data-delete-trigger
-                        th:attr="data-title=${todo.title}"
-                        onclick="return confirm('本当に削除しますか？')"
-                      >
-                        削除
+                      <button class="btn btn-sm btn-outline-danger" type="submit"
+                              data-delete-trigger th:attr="data-title=${todo.title}"
+                              onclick="return confirm('#{msg.confirm_delete}')"
+                              th:text="#{btn.delete}">
+                        Delete
                       </button>
                     </form>
                   </td>
                 </tr>
-                <tr th:if="${todos == null or #lists.isEmpty(todos)}">
-                  <td colspan="5" class="text-center text-muted py-4">ToDoがありません</td>
-                </tr>
               </tbody>
-              </table>
+            </table>
           </div>
+
           <form id="bulk-delete-form" th:action="@{/todos/bulk-delete}" method="post" class="d-flex gap-3 align-items-center mt-2">
-            <button class="btn btn-danger" type="submit" id="bulk-delete-btn" style="display: none;">
-              選択した項目を削除
+            <button class="btn btn-danger" type="submit" id="bulk-delete-btn" style="display: none;" th:text="#{btn.bulk_delete}">
+              Bulk Delete
             </button>
             <span id="selected-count-wrap" class="text-muted small" style="display: none;">
-              選択中: <span id="selected-count">0</span>件
+              <span th:text="#{label.selected_count}">Selected</span>:
+              <span id="selected-count">0</span>
+              <span th:text="#{label.count}">items</span>
             </span>
           </form>
         </div>
@@ -166,11 +189,29 @@
 
     <footer class="border-top bg-white">
       <div class="container py-3 text-muted small">
-        © 2026 ToDo App
+        <span th:text="#{msg.footer}">© 2026 ToDo App</span>
         <span class="mx-2">|</span>
-        <a th:href="@{/categories}" class="text-decoration-none">カテゴリを追加する</a>
+        <a th:href="@{/categories}" class="text-decoration-none" th:text="#{nav.categories}">Categories</a>
+        <span class="mx-2" sec:authorize="hasRole('ADMIN')">|</span>
+        <a th:href="@{/admin/users}" class="text-decoration-none" sec:authorize="hasRole('ADMIN')" th:text="#{nav.admin}">Admin</a>
       </div>
     </footer>
+
+    <div id="delete-modal" class="modal-backdrop" style="display: none;">
+      <div class="modal-dialog-centered">
+        <div class="modal-content p-3">
+          <h5 class="mb-2" th:text="#{btn.delete}">Delete</h5>
+          <p class="mb-3">
+            <span id="delete-title"></span>
+            <span th:text="#{msg.confirm_delete}">Delete?</span>
+          </p>
+          <div class="d-flex gap-2 justify-content-end">
+            <button type="button" class="btn btn-outline-secondary" id="delete-cancel" th:text="#{btn.cancel}">Cancel</button>
+            <button type="button" class="btn btn-danger" id="delete-confirm" th:text="#{btn.delete}">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <script>
       setTimeout(() => {
@@ -179,77 +220,15 @@
         });
       }, 3000);
     </script>
-    <div id="delete-modal" class="modal-backdrop" style="display: none;">
-      <div class="modal-dialog-centered">
-        <div class="modal-content p-3">
-          <h5 class="mb-2">削除確認</h5>
-          <p class="mb-3">
-            「<span id="delete-title">タイトル</span>」を削除しますか？
-          </p>
-          <div class="d-flex gap-2 justify-content-end">
-            <button type="button" class="btn btn-outline-secondary" id="delete-cancel">キャンセル</button>
-            <button type="button" class="btn btn-danger" id="delete-confirm">削除する</button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <style>
-      .table-layout-fixed {
-        table-layout: fixed;
-      }
-      .modal-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.4);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 1050;
-      }
-      .modal-dialog-centered {
-        max-width: 420px;
-        width: calc(100% - 2rem);
-      }
-      .modal-content {
-        background: #fff;
-        color: #212529;
-        border-radius: 12px;
-        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
-      }
-    </style>
-    <script>
-      document.querySelectorAll("form[data-ajax='toggle']").forEach((form) => {
-        form.addEventListener("submit", async (event) => {
-          event.preventDefault();
-          const checkbox = form.querySelector("input[type='checkbox']");
-          const row = form.closest("tr");
-          const title = row.querySelector("[data-title]");
-          try {
-            const response = await fetch(form.action, {
-              method: "POST",
-              headers: { "X-Requested-With": "XMLHttpRequest" },
-            });
-            if (!response.ok) throw new Error("toggle failed");
-            const data = await response.json();
-            if (title) {
-              title.classList.toggle("text-decoration-line-through", data.completed);
-              title.classList.toggle("text-muted", data.completed);
-            }
-            checkbox.checked = data.completed;
-          } catch (e) {
-            checkbox.checked = !checkbox.checked;
-            alert("更新に失敗しました。");
-          }
-        });
-      });
-    </script>
-    <script>
+    <script th:inline="javascript">
       (() => {
         const selectAll = document.getElementById("select-all");
         const checks = () => Array.from(document.querySelectorAll(".row-check"));
         const bulkForm = document.getElementById("bulk-delete-form");
         const selectedCount = document.getElementById("selected-count");
         const selectedWrap = document.getElementById("selected-count-wrap");
+        const bulkNoneMsg = /*[[#{msg.bulk_delete_none}]]*/ "No items selected.";
+        const bulkConfirmMsg = /*[[#{msg.confirm_bulk_delete}]]*/ "Delete selected todos?";
 
         const updateSelected = () => {
           if (!selectedCount) return;
@@ -284,16 +263,104 @@
             const selected = checks().filter((c) => c.checked).length;
             if (selected === 0) {
               e.preventDefault();
-              alert("削除対象が選択されていません。");
+              alert(bulkNoneMsg);
               return;
             }
-            if (!confirm("選択した項目を削除しますか？")) {
+            if (!confirm(bulkConfirmMsg)) {
               e.preventDefault();
             }
           });
         }
 
         updateSelected();
+      })();
+    </script>
+    <script th:inline="javascript">
+      (() => {
+        const forms = Array.from(document.querySelectorAll(".toggle-form"));
+        if (forms.length === 0) return;
+
+        const confirmUncomplete = /*[[#{msg.confirm_uncomplete}]]*/ "Change to not completed?";
+        const labelCompleted = /*[[#{label.completed}]]*/ "Completed";
+        const labelNotCompleted = /*[[#{label.not_completed}]]*/ "Not completed";
+        const statusUpdateFailed = /*[[#{msg.status_update_failed}]]*/ "Failed to update status.";
+
+        forms.forEach((form) => {
+          form.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const isCompleted = form.getAttribute("data-completed") === "true";
+            if (isCompleted && !confirm(confirmUncomplete)) {
+              return;
+            }
+            try {
+              const csrfInput = form.querySelector("input[type='hidden']");
+              const csrfHeader = csrfInput ? csrfInput.name : null;
+              const csrfToken = csrfInput ? csrfInput.value : null;
+              const headers = { "X-Requested-With": "XMLHttpRequest" };
+              if (csrfHeader && csrfToken) {
+                headers[csrfHeader] = csrfToken;
+              }
+              const response = await fetch(form.action, {
+                method: "POST",
+                headers,
+              });
+              if (!response.ok) throw new Error("toggle failed");
+              const data = await response.json();
+              form.setAttribute("data-completed", String(data.completed));
+              const button = form.querySelector("button");
+              if (button) {
+                if (data.completed) {
+                  button.classList.remove("btn-outline-secondary");
+                  button.classList.add("btn-success");
+                  button.textContent = labelCompleted;
+                } else {
+                  button.classList.remove("btn-success");
+                  button.classList.add("btn-outline-secondary");
+                  button.textContent = labelNotCompleted;
+                }
+              }
+            } catch (e) {
+              alert(statusUpdateFailed);
+            }
+          });
+        });
+      })();
+    </script>
+    <script th:inline="javascript">
+      (() => {
+        const csvLink = document.getElementById("csv-download");
+        if (!csvLink) return;
+
+        const confirmSelected = /*[[#{msg.csv_confirm_selected}]]*/ "Export selected todos to CSV?";
+        const confirmAll = /*[[#{msg.csv_confirm_all}]]*/ "Export all todos to CSV?";
+
+        csvLink.addEventListener("click", (event) => {
+          const msg = document.getElementById("csv-empty-message");
+          if (msg) msg.classList.add("d-none");
+          const rows = Array.from(document.querySelectorAll(".row-check"));
+          if (rows.length === 0) {
+            event.preventDefault();
+            if (msg) {
+              msg.classList.remove("d-none");
+              msg.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+            return;
+          }
+
+          const selected = rows.filter((c) => c.checked).map((c) => c.value);
+          const message = selected.length > 0 ? confirmSelected : confirmAll;
+          if (!confirm(message)) {
+            event.preventDefault();
+            return;
+          }
+
+          if (selected.length > 0) {
+            const url = new URL(csvLink.href, window.location.origin);
+            url.searchParams.delete("ids");
+            selected.forEach((id) => url.searchParams.append("ids", id));
+            csvLink.href = url.pathname + url.search;
+          }
+        });
       })();
     </script>
     <script>
@@ -304,11 +371,15 @@
         const btnConfirm = document.getElementById("delete-confirm");
         let targetForm = null;
 
+        if (!modal) return;
+
         document.querySelectorAll("[data-delete-trigger]").forEach((btn) => {
           btn.addEventListener("click", (e) => {
             e.preventDefault();
             targetForm = btn.closest("form");
-            titleEl.textContent = btn.getAttribute("data-title") || "このToDo";
+            if (titleEl) {
+              titleEl.textContent = btn.getAttribute("data-title") || "";
+            }
             modal.style.display = "flex";
           });
         });
@@ -332,5 +403,40 @@
         });
       })();
     </script>
+    <style>
+      .table-layout-fixed {
+        table-layout: fixed;
+      }
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1050;
+      }
+      .modal-dialog-centered {
+        max-width: 420px;
+        width: calc(100% - 2rem);
+      }
+      .modal-content {
+        background: #fff;
+        color: #212529;
+        border-radius: 12px;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+      }
+    </style>
+  <script
+  src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+  integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+  crossorigin="anonymous"></script>
   </body>
 </html>
+
+
+
+
+
+
+

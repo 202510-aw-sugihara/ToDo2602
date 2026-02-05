@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="ja">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>ToDo新規作成</title>
+    <title th:text="#{title.new}">New</title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -13,9 +13,29 @@
   </head>
   <body class="bg-light">
     <header class="border-bottom bg-white">
-      <div class="container py-3">
-        <h1 class="h4 mb-0">ToDo新規作成</h1>
-      </div>
+      <div class="container py-3 d-flex justify-content-between align-items-center">
+        <h1 class="h4 mb-0" th:text="#{title.new}">New</h1>
+        <div class="d-flex align-items-center gap-2">
+        <div class="dropdown">
+  <button class="btn btn-outline-secondary dropdown-toggle"
+          type="button"
+          data-bs-toggle="dropdown"
+          aria-expanded="false"
+          th:text="${currentLangLabel}">Language</button>
+  <ul class="dropdown-menu">
+    <li th:each="opt : ${langOptions}">
+      <a class="dropdown-item"
+         th:classappend="${currentLang == opt.code} ? 'active' : ''"
+         th:href="@{/todos/new(lang=${opt.code})}"
+         th:text="${opt.label}">JA</a>
+    </li>
+  </ul>
+</div>
+          <form th:action="@{/logout}" method="post" class="ms-1">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+            <button class="btn btn-outline-secondary btn-sm" type="submit">ログアウト</button>
+          </form>
+        </div>
     </header>
 
     <main class="container my-4">
@@ -24,62 +44,61 @@
           <form th:action="@{/todos/confirm}" th:object="${todoForm}" method="post"
                 enctype="multipart/form-data" class="vstack gap-3">
             <div>
-              <label class="form-label">作成者</label>
+              <label class="form-label" th:text="#{label.author}">Author</label>
               <input class="form-control" type="text" th:field="*{author}" />
               <div class="text-danger small" th:if="${#fields.hasErrors('author')}" th:errors="*{author}">
-                作成者のエラー
+                Error
               </div>
             </div>
             <div>
-              <label class="form-label">タイトル</label>
+              <label class="form-label" th:text="#{label.title}">Title</label>
               <input class="form-control" type="text" th:field="*{title}" />
               <div class="text-danger small" th:if="${#fields.hasErrors('title')}" th:errors="*{title}">
-                タイトルのエラー
+                Error
               </div>
             </div>
             <div>
-              <label class="form-label">詳細</label>
+              <label class="form-label" th:text="#{label.detail}">Detail</label>
               <textarea class="form-control" rows="4" th:field="*{detail}"></textarea>
               <div class="text-danger small" th:if="${#fields.hasErrors('detail')}" th:errors="*{detail}">
-                詳細のエラー
+                Error
               </div>
             </div>
             <div>
-              <label class="form-label">期限日</label>
+              <label class="form-label" th:text="#{label.due_date}">Due</label>
               <input class="form-control" type="date" th:field="*{dueDate}" />
               <div class="text-danger small" th:if="${#fields.hasErrors('dueDate')}" th:errors="*{dueDate}">
-                期限日のエラー
+                Error
               </div>
             </div>
             <div>
-              <label class="form-label">優先度</label>
+              <label class="form-label" th:text="#{label.priority}">Priority</label>
               <select class="form-select" th:field="*{priority}">
-                <option value="" disabled>選択してください</option>
+                <option value="" disabled>--</option>
                 <option th:each="p : ${T(com.example.todo.Priority).values()}"
                         th:value="${p}"
-                        th:text="${p.label}">
-                  高
+                        th:text="${#messages.msg('priority.' + p.name().toLowerCase())}">
+                  Middle
                 </option>
               </select>
               <div class="text-danger small" th:if="${#fields.hasErrors('priority')}" th:errors="*{priority}">
-                優先度のエラー
+                Error
               </div>
             </div>
             <div>
-              <label class="form-label">カテゴリ</label>
+              <label class="form-label" th:text="#{label.category}">Category</label>
               <select class="form-select" th:field="*{categoryId}">
-                <option value="" selected>未選択</option>
-                <option th:each="c : ${categories}" th:value="${c.id}" th:text="${c.name}">カテゴリ</option>
+                <option value="" selected>--</option>
+                <option th:each="c : ${categories}" th:value="${c.id}" th:text="${categoryLabels[c.id]}">Category</option>
               </select>
             </div>
             <div>
-              <label class="form-label">添付ファイル</label>
+              <label class="form-label" th:text="#{label.attachments}">Attachments</label>
               <div id="new-file-inputs" class="vstack gap-2">
                 <input class="form-control" type="file" name="files" />
               </div>
-              <div class="form-text">ファイルを選択すると追加の入力欄が表示されます。</div>
+              <div class="form-text" th:text="#{msg.file_select}">Select file</div>
               <div class="mt-2" th:if="${todoForm.attachmentOriginalFilenames != null}">
-                現在選択:
                 <ul class="mb-0">
                   <li th:each="name : ${todoForm.attachmentOriginalFilenames}" th:text="${name}">file</li>
                 </ul>
@@ -89,43 +108,51 @@
               <input type="hidden" th:each="v : ${todoForm.attachmentContentTypes}" th:name="attachmentContentTypes" th:value="${v}" />
               <input type="hidden" th:each="v : ${todoForm.attachmentSizes}" th:name="attachmentSizes" th:value="${v}" />
             </div>
-          <div class="d-flex gap-2">
-            <button class="btn btn-primary" type="submit">確認</button>
-            <a class="btn btn-outline-secondary" th:href="@{/todos}">戻る</a>
-          </div>
-        </form>
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary" type="submit" th:text="#{btn.confirm}">Confirm</button>
+              <a class="btn btn-outline-secondary" th:href="@{/todos}" th:text="#{btn.back}">Back</a>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
-  </main>
-  <script>
-    (() => {
-      const container = document.getElementById("new-file-inputs");
-      if (!container) return;
+    </main>
+    <script>
+      (() => {
+        const container = document.getElementById("new-file-inputs");
+        if (!container) return;
 
-      const addInput = () => {
-        const input = document.createElement("input");
-        input.type = "file";
-        input.name = "files";
-        input.className = "form-control";
-        input.addEventListener("change", () => {
-          const inputs = Array.from(container.querySelectorAll("input[type='file']"));
-          const last = inputs[inputs.length - 1];
-          if (last === input && input.files && input.files.length > 0) {
-            addInput();
-          }
-        });
-        container.appendChild(input);
-      };
+        const addInput = () => {
+          const input = document.createElement("input");
+          input.type = "file";
+          input.name = "files";
+          input.className = "form-control";
+          input.addEventListener("change", () => {
+            const inputs = Array.from(container.querySelectorAll("input[type='file']"));
+            const last = inputs[inputs.length - 1];
+            if (last === input && input.files && input.files.length > 0) {
+              addInput();
+            }
+          });
+          container.appendChild(input);
+        };
 
-      const first = container.querySelector("input[type='file']");
-      if (first) {
-        first.addEventListener("change", () => {
-          if (first.files && first.files.length > 0) {
-            addInput();
-          }
-        });
-      }
-    })();
-  </script>
-</body>
+        const first = container.querySelector("input[type='file']");
+        if (first) {
+          first.addEventListener("change", () => {
+            if (first.files && first.files.length > 0) {
+              addInput();
+            }
+          });
+        }
+      })();
+    </script>
+  <script
+  src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+  integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+  crossorigin="anonymous"></script>
+  </body>
 </html>
+
+
+
+

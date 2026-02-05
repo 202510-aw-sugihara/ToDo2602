@@ -17,39 +17,48 @@
     <association property="user" javaType="com.example.todo.AppUser">
       <id column="user_id" property="id"/>
     </association>
+    <association property="category" javaType="com.example.todo.Category">
+      <id column="category_id" property="id"/>
+      <result column="category_name" property="name"/>
+      <result column="category_color" property="color"/>
+    </association>
   </resultMap>
 
   <select id="search" parameterType="map" resultMap="TodoResultMap">
     SELECT
-      id,
-      author,
-      title,
-      description,
-      due_date,
-      priority,
-      completed,
-      created_at,
-      updated_at,
-      version,
-      user_id
-    FROM todos
+      t.id,
+      t.author,
+      t.title,
+      t.description,
+      t.due_date,
+      t.priority,
+      t.completed,
+      t.created_at,
+      t.updated_at,
+      t.version,
+      t.user_id,
+      t.category_id,
+      c.name AS category_name,
+      c.color AS category_color
+    FROM todos t
+    LEFT JOIN categories c ON c.id = t.category_id
     <where>
       <if test="userId != null">
-        AND user_id = #{userId}
+        AND t.user_id = #{userId}
       </if>
       <if test="keyword != null and keyword != ''">
-        AND title LIKE CONCAT('%', #{keyword}, '%')
+        AND t.title LIKE CONCAT('%', #{keyword}, '%')
       </if>
       <if test="categoryId != null">
-        AND category_id = #{categoryId}
+        AND t.category_id = #{categoryId}
       </if>
     </where>
     <choose>
-      <when test="sort == 'createdAt'">ORDER BY created_at</when>
-      <when test="sort == 'title'">ORDER BY title</when>
-      <when test="sort == 'dueDate'">ORDER BY due_date</when>
-      <when test="sort == 'completed'">ORDER BY completed</when>
-      <otherwise>ORDER BY created_at</otherwise>
+      <when test="sort == 'createdAt'">ORDER BY t.created_at</when>
+      <when test="sort == 'title'">ORDER BY t.title</when>
+      <when test="sort == 'dueDate'">ORDER BY t.due_date</when>
+      <when test="sort == 'completed'">ORDER BY t.completed</when>
+      <otherwise>ORDER BY t.created_at</otherwise>
     </choose>
     <choose>
       <when test="direction == 'asc'">ASC</when>

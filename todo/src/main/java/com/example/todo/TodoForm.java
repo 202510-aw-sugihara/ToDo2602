@@ -17,23 +17,23 @@ public class TodoForm {
 
   private Long id;
 
-  @NotBlank(message = "作成者は必須です。")
-  @Size(max = 50, message = "作成者は50文字以内で入力してください。")
+  @NotBlank(message = "{todo.author.required}")
+  @Size(max = 50, message = "{todo.author.size}")
   private String author;
 
-  @NotBlank(message = "タイトルは必須です。")
-  @Size(max = 100, message = "タイトルは100文字以内で入力してください。")
+  @NotBlank(message = "{todo.title.required}")
+  @Size(max = 100, message = "{todo.title.size}")
   private String title;
 
-  @Size(max = 500, message = "詳細は500文字以内で入力してください。")
+  @Size(max = 500, message = "{todo.detail.size}")
   private String detail;
 
-  @NotNull(message = "期限日は必須です。")
-  @FutureOrPresent(message = "期限日は今日以降の日付を指定してください。")
+  @NotNull(message = "{todo.due_date.required}")
+  @FutureOrPresent(message = "{todo.due_date.future}")
   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
   private LocalDate dueDate;
 
-  @NotNull(message = "優先度は必須です。")
+  @NotNull(message = "{todo.priority.required}")
   private Priority priority;
 
   private Long categoryId;

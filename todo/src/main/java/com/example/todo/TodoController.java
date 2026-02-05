@@ -5,14 +5,18 @@ import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Pattern;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
+import org.springframework.core.io.Resource;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -30,11 +34,14 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.SessionAttributes;
+import org.springframework.web.bind.support.SessionStatus;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import org.springframework.web.multipart.MultipartFile;
 
 @Controller
+@SessionAttributes("todoForm")
 @RequestMapping("/todos")
 public class TodoController {
 
@@ -43,21 +50,48 @@ public class TodoController {
   private final AppUserRepository appUserRepository;
   private final TodoAttachmentService todoAttachmentService;
   private final FileStorageService fileStorageService;
+  private final MessageSource messageSource;
   private static final Pattern STORED_NAME_PATTERN = Pattern.compile("^[a-fA-F0-9]{32}.*$");
 
   public TodoController(TodoService todoService, CategoryRepository categoryRepository,
       AppUserRepository appUserRepository, TodoAttachmentService todoAttachmentService,
-      FileStorageService fileStorageService) {
+      FileStorageService fileStorageService, MessageSource messageSource) {
     this.todoService = todoService;
     this.categoryRepository = categoryRepository;
     this.appUserRepository = appUserRepository;
     this.todoAttachmentService = todoAttachmentService;
     this.fileStorageService = fileStorageService;
+    this.messageSource = messageSource;
+  }
+
+  private String msg(String code) {
+    Locale locale = LocaleContextHolder.getLocale();
+    return messageSource.getMessage(code, null, locale);
+  }
+
+  @ModelAttribute("todoForm")
+  public TodoForm todoForm() {
+    return new TodoForm();
   }
 
   @ModelAttribute("categories")
   public List<Category> categories() {
     return categoryRepository.findAll();
+  }
+
+  @ModelAttribute("categoryLabels")
+  public Map<Long, String> categoryLabels() {
+    Map<Long, String> labels = new LinkedHashMap<>();
+    Locale locale = LocaleContextHolder.getLocale();
+    for (Category category : categoryRepository.findAll()) {
+      if (category == null || category.getId() == null) {
+        continue;
+      }
+      String fallback = category.getName();
+      String label = messageSource.getMessage("category." + category.getId(), null, fallback, locale);
+      labels.put(category.getId(), label);
+    }
+    return labels;
   }
 
   @GetMapping
@@ -192,11 +226,13 @@ public class TodoController {
   @PostMapping("/complete")
   public String complete(@ModelAttribute("todoForm") TodoForm form,
       RedirectAttributes redirectAttributes,
-      @AuthenticationPrincipal UserDetails userDetails) {
+      @AuthenticationPrincipal UserDetails userDetails,
+      SessionStatus sessionStatus) {
     long userId = requireUserId(userDetails);
     Todo created = todoService.create(userId, form);
     todoAttachmentService.attachStoredList(created, form);
-    redirectAttributes.addFlashAttribute("successMessage", "登録が完了しました。");
+    redirectAttributes.addFlashAttribute("successMessage", msg("msg.success_saved"));
+    sessionStatus.setComplete();
     return "redirect:/todos";
   }
 
@@ -206,7 +242,7 @@ public class TodoController {
       @AuthenticationPrincipal UserDetails userDetails) {
     Todo todo = todoService.findById(id).orElse(null);
     if (todo == null) {
-      throw new TodoNotFoundException("指定されたToDoが見つかりませんでした。");
+      throw new TodoNotFoundException(msg("msg.not_found"));
     }
     ensureOwner(todo, requireUserId(userDetails));
     model.addAttribute("attachments", todoAttachmentService.findByTodoId(todo.getId()));
@@ -252,13 +288,13 @@ public class TodoController {
         }
       }
     } catch (OptimisticLockingFailureException ex) {
-      model.addAttribute("errorMessage", "ほかのユーザーが更新しました。もう一度やり直してください。");
+      model.addAttribute("errorMessage", msg("msg.concurrent_update"));
       return "todo/edit";
     } catch (IllegalArgumentException ex) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     }
 
-    redirectAttributes.addFlashAttribute("successMessage", "更新が完了しました。");
+    redirectAttributes.addFlashAttribute("successMessage", msg("msg.success_updated"));
     return "redirect:/todos/update-complete?title=" + java.net.URLEncoder.encode(form.getTitle(), StandardCharsets.UTF_8);
   }
 
@@ -266,7 +302,7 @@ public class TodoController {
   public String updateComplete(@RequestParam(name = "title", required = false) String title,
       Model model) {
     model.addAttribute("title", title);
-    model.addAttribute("message", "更新が完了しました。");
+    model.addAttribute("message", msg("msg.success_updated"));
     return "todo/complete";
   }
 
@@ -279,9 +315,9 @@ public class TodoController {
           .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
       ensureOwner(existing, requireUserId(userDetails));
       todoService.deleteById(id);
-      redirectAttributes.addFlashAttribute("successMessage", "ToDoを削除しました。");
+      redirectAttributes.addFlashAttribute("successMessage", msg("msg.success_deleted"));
     } catch (IllegalArgumentException ex) {
-      redirectAttributes.addFlashAttribute("errorMessage", "削除に失敗しました。");
+      redirectAttributes.addFlashAttribute("errorMessage", msg("msg.not_found"));
     }
     return "redirect:/todos";
   }
@@ -293,17 +329,17 @@ public class TodoController {
       RedirectAttributes redirectAttributes,
       @AuthenticationPrincipal UserDetails userDetails) {
     Todo todo = todoService.findById(id)
-        .orElseThrow(() -> new TodoNotFoundException("指定されたToDoが見つかりませんでした。"));
+        .orElseThrow(() -> new TodoNotFoundException(msg("msg.not_found")));
     ensureOwner(todo, requireUserId(userDetails));
     if (file == null || file.isEmpty()) {
-      redirectAttributes.addFlashAttribute("errorMessage", "ファイルが選択されていません。");
+      redirectAttributes.addFlashAttribute("errorMessage", msg("msg.file_select"));
       if ("edit".equalsIgnoreCase(redirect)) {
         return "redirect:/todos/" + id + "/edit";
       }
       return "redirect:/todos/" + id;
     }
     todoAttachmentService.upload(todo, file);
-    redirectAttributes.addFlashAttribute("successMessage", "添付ファイルをアップロードしました。");
+    redirectAttributes.addFlashAttribute("successMessage", msg("msg.success_updated"));
     if ("edit".equalsIgnoreCase(redirect)) {
       return "redirect:/todos/" + id + "/edit";
     }
@@ -331,12 +367,12 @@ public class TodoController {
       Model model,
       @AuthenticationPrincipal UserDetails userDetails) {
     Todo todo = todoService.findById(todoId)
-        .orElseThrow(() -> new TodoNotFoundException("指定されたToDoが見つかりませんでした。"));
+        .orElseThrow(() -> new TodoNotFoundException(msg("msg.not_found")));
     ensureOwner(todo, requireUserId(userDetails));
     TodoAttachment attachment = todoAttachmentService.findById(attachmentId);
     if (attachment == null || attachment.getTodo() == null
         || !attachment.getTodo().getId().equals(todoId)) {
-      throw new TodoNotFoundException("添付ファイルが見つかりませんでした。");
+      throw new TodoNotFoundException(msg("msg.not_found"));
     }
     String type = attachment.getContentType() == null || attachment.getContentType().isBlank()
         ? MediaType.APPLICATION_OCTET_STREAM_VALUE
@@ -359,7 +395,7 @@ public class TodoController {
     requireUserId(userDetails);
     if (stored == null || stored.contains("..") || stored.contains("/") || stored.contains("\\")
         || !STORED_NAME_PATTERN.matcher(stored).matches()) {
-      throw new TodoNotFoundException("添付ファイルが見つかりませんでした。");
+      throw new TodoNotFoundException(msg("msg.not_found"));
     }
     Resource resource = fileStorageService.loadAsResource(stored);
     String safeName = (name == null || name.isBlank()) ? stored : name;
@@ -384,7 +420,7 @@ public class TodoController {
     requireUserId(userDetails);
     if (stored == null || stored.contains("..") || stored.contains("/") || stored.contains("\\")
         || !STORED_NAME_PATTERN.matcher(stored).matches()) {
-      throw new TodoNotFoundException("添付ファイルが見つかりませんでした。");
+      throw new TodoNotFoundException(msg("msg.not_found"));
     }
     String safeName = (name == null || name.isBlank()) ? stored : name;
     String type = (contentType == null || contentType.isBlank())
@@ -409,15 +445,15 @@ public class TodoController {
       RedirectAttributes redirectAttributes,
       @AuthenticationPrincipal UserDetails userDetails) {
     Todo todo = todoService.findById(todoId)
-        .orElseThrow(() -> new TodoNotFoundException("指定されたToDoが見つかりませんでした。"));
+        .orElseThrow(() -> new TodoNotFoundException(msg("msg.not_found")));
     ensureOwner(todo, requireUserId(userDetails));
     TodoAttachment attachment = todoAttachmentService.findById(attachmentId);
     if (attachment == null || attachment.getTodo() == null
         || !attachment.getTodo().getId().equals(todoId)) {
-      throw new TodoNotFoundException("添付ファイルが見つかりませんでした。");
+      throw new TodoNotFoundException(msg("msg.not_found"));
     }
     todoAttachmentService.delete(attachment);
-    redirectAttributes.addFlashAttribute("successMessage", "添付ファイルを削除しました。");
+    redirectAttributes.addFlashAttribute("successMessage", msg("msg.success_deleted"));
     return "redirect:/todos/" + todoId;
   }
 
@@ -428,9 +464,9 @@ public class TodoController {
     long userId = requireUserId(userDetails);
     int deleted = todoService.deleteByIds(userId, ids);
     if (deleted > 0) {
-      redirectAttributes.addFlashAttribute("successMessage", "選択したToDoを削除しました。");
+      redirectAttributes.addFlashAttribute("successMessage", msg("msg.success_deleted"));
     } else {
-      redirectAttributes.addFlashAttribute("errorMessage", "削除対象が選択されていません。");
+      redirectAttributes.addFlashAttribute("errorMessage", msg("msg.bulk_delete_none"));
     }
     return "redirect:/todos";
   }
@@ -451,7 +487,7 @@ public class TodoController {
       if (ajax) {
         return ResponseEntity.ok(Map.of("completed", completed));
       }
-      redirectAttributes.addFlashAttribute("successMessage", "完了状態を更新しました。");
+      redirectAttributes.addFlashAttribute("successMessage", msg("msg.success_updated"));
       return "redirect:/todos";
     } catch (ResponseStatusException ex) {
       if (ajax) {
@@ -462,7 +498,7 @@ public class TodoController {
       if (ajax) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "not_found"));
       }
-      redirectAttributes.addFlashAttribute("errorMessage", "対象のToDoが見つかりませんでした。");
+      redirectAttributes.addFlashAttribute("errorMessage", msg("msg.not_found"));
       return "redirect:/todos";
     }
   }
@@ -486,12 +522,12 @@ public class TodoController {
   private ResponseEntity<Resource> attachmentResource(long todoId, long attachmentId,
       boolean download, UserDetails userDetails) {
     Todo todo = todoService.findById(todoId)
-        .orElseThrow(() -> new TodoNotFoundException("指定されたToDoが見つかりませんでした。"));
+        .orElseThrow(() -> new TodoNotFoundException(msg("msg.not_found")));
     ensureOwner(todo, requireUserId(userDetails));
     TodoAttachment attachment = todoAttachmentService.findById(attachmentId);
     if (attachment == null || attachment.getTodo() == null
         || !attachment.getTodo().getId().equals(todoId)) {
-      throw new TodoNotFoundException("添付ファイルが見つかりませんでした。");
+      throw new TodoNotFoundException(msg("msg.not_found"));
     }
     Resource resource = fileStorageService.loadAsResource(attachment.getStoredFilename());
     String contentType = attachment.getContentType() != null && !attachment.getContentType().isBlank()
