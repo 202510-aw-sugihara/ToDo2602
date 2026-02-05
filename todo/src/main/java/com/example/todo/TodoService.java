@@ -43,6 +43,38 @@ public class TodoService {
     return new PageImpl<>(content, pageable, total);
   }
 
+  public List<Todo> findForExport(String keyword, String sort, String direction, Long categoryId) {
+    String safeSort = (sort == null || sort.isBlank()) ? "createdAt" : sort;
+    String safeDirection = (direction == null || direction.isBlank()) ? "desc" : direction;
+    String safeKeyword = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
+    long total = todoMapper.count(safeKeyword, categoryId);
+    if (total <= 0) {
+      return List.of();
+    }
+    int limit = total > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) total;
+    return todoMapper.search(safeKeyword, safeSort, safeDirection, categoryId, limit, 0);
+  }
+
+  public List<Todo> findForExportByIds(List<Long> ids) {
+    if (ids == null || ids.isEmpty()) {
+      return List.of();
+    }
+    List<Todo> todos = todoRepository.findAllById(ids);
+    todos.sort((a, b) -> {
+      if (a.getCreatedAt() == null && b.getCreatedAt() == null) {
+        return 0;
+      }
+      if (a.getCreatedAt() == null) {
+        return 1;
+      }
+      if (b.getCreatedAt() == null) {
+        return -1;
+      }
+      return b.getCreatedAt().compareTo(a.getCreatedAt());
+    });
+    return todos;
+  }
+
   public Optional<Todo> findById(long id) {
     return todoRepository.findById(id);
   }

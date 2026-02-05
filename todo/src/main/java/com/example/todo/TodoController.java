@@ -2,13 +2,18 @@ package com.example.todo;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -64,6 +69,55 @@ public class TodoController {
     model.addAttribute("start", start);
     model.addAttribute("end", end);
     return "index";
+  }
+
+  @GetMapping("/export")
+  public ResponseEntity<byte[]> exportCsv(@RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String sort,
+      @RequestParam(required = false) String direction,
+      @RequestParam(required = false) Long categoryId,
+      @RequestParam(required = false) List<Long> ids) {
+    List<Todo> todos = (ids != null && !ids.isEmpty())
+        ? todoService.findForExportByIds(ids)
+        : todoService.findForExport(keyword, sort, direction, categoryId);
+    if (todos.isEmpty()) {
+      return ResponseEntity.noContent().build();
+    }
+
+    StringBuilder csv = new StringBuilder();
+    csv.append("ID,タイトル,登録者,ステータス,作成日\r\n");
+    DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
+    for (Todo todo : todos) {
+      csv.append(csvCell(todo.getId() == null ? "" : String.valueOf(todo.getId()))).append(",");
+      csv.append(csvCell(todo.getTitle())).append(",");
+      csv.append(csvCell(todo.getAuthor())).append(",");
+      csv.append(csvCell(todo.isCompleted() ? "完了" : "未完了")).append(",");
+      String createdAt = todo.getCreatedAt() == null ? "" : todo.getCreatedAt().format(dateFormatter);
+      csv.append(csvCell(createdAt)).append("\r\n");
+    }
+
+    byte[] body = csv.toString().getBytes(StandardCharsets.UTF_8);
+    byte[] bom = new byte[] {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+    byte[] bytes = new byte[bom.length + body.length];
+    System.arraycopy(bom, 0, bytes, 0, bom.length);
+    System.arraycopy(body, 0, bytes, bom.length, body.length);
+
+    String filename = "todo_" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + ".csv";
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(new MediaType("text", "csv", StandardCharsets.UTF_8));
+    headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"");
+
+    return ResponseEntity.ok().headers(headers).body(bytes);
+  }
+
+  private String csvCell(String value) {
+    if (value == null) {
+      return "";
+    }
+    boolean needsQuote = value.contains(",") || value.contains("\"")
+        || value.contains("\r") || value.contains("\n");
+    String escaped = value.replace("\"", "\"\"");
+    return needsQuote ? "\"" + escaped + "\"" : escaped;
   }
 
   // ToDo新規作成画面を表示します。

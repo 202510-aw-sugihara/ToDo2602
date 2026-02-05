@@ -15,7 +15,14 @@
     <header class="border-bottom bg-white">
       <div class="container py-3 d-flex align-items-center justify-content-between">
         <h1 class="h4 mb-0">ToDoアプリ</h1>
-        <a class="btn btn-primary" th:href="@{/todos/new}">新規作成</a>
+        <div class="d-flex gap-2">
+          <a class="btn btn-outline-secondary"
+             id="csv-download"
+             th:href="@{/todos/export(keyword=${keyword}, categoryId=${categoryId}, sort=${sort}, direction=${direction})}">
+            CSVダウンロード
+          </a>
+          <a class="btn btn-primary" th:href="@{/todos/new}">新規作成</a>
+        </div>
       </div>
       <div class="container pb-3 d-flex justify-content-end">
         <form class="row g-2 align-items-center" method="get" th:action="@{/todos}">
@@ -60,6 +67,9 @@
         失敗しました。
       </div>
 
+      <div id="csv-empty-message" class="alert alert-info d-none" role="alert">
+        出力対象のToDoがありません。
+      </div>
       <div class="card shadow-sm">
         <div class="card-body">
           <h2 class="h5 mb-3">一覧</h2>
@@ -315,6 +325,44 @@
         }
 
         updateSelected();
+      })();
+    </script>
+    <script>
+      (() => {
+        const csvLink = document.getElementById("csv-download");
+        if (!csvLink) return;
+
+        csvLink.addEventListener("click", (event) => {
+          const msg = document.getElementById("csv-empty-message");
+          if (msg) {
+            msg.classList.add("d-none");
+          }
+          const rows = Array.from(document.querySelectorAll(".row-check"));
+          if (rows.length === 0) {
+            event.preventDefault();
+            if (msg) {
+              msg.classList.remove("d-none");
+              msg.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+            return;
+          }
+
+          const selected = rows.filter((c) => c.checked).map((c) => c.value);
+          const message = selected.length > 0
+            ? "選択したToDoをCSV出力します。よろしいですか？"
+            : "全件をCSV出力します。よろしいですか？";
+          if (!confirm(message)) {
+            event.preventDefault();
+            return;
+          }
+
+          if (selected.length > 0) {
+            const url = new URL(csvLink.href, window.location.origin);
+            url.searchParams.delete("ids");
+            selected.forEach((id) => url.searchParams.append("ids", id));
+            csvLink.href = url.pathname + url.search;
+          }
+        });
       })();
     </script>
     <div id="delete-modal" class="modal-backdrop" style="display: none;">
