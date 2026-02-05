@@ -15,19 +15,24 @@ public class TodoService {
   private final TodoMapper todoMapper;
   private final CategoryRepository categoryRepository;
   private final AppUserRepository appUserRepository;
+  private final AuditLogService auditLogService;
 
   public TodoService(TodoRepository todoRepository, TodoMapper todoMapper,
-      CategoryRepository categoryRepository, AppUserRepository appUserRepository) {
+      CategoryRepository categoryRepository, AppUserRepository appUserRepository,
+      AuditLogService auditLogService) {
     this.todoRepository = todoRepository;
     this.todoMapper = todoMapper;
     this.categoryRepository = categoryRepository;
     this.appUserRepository = appUserRepository;
+    this.auditLogService = auditLogService;
   }
 
+  @Transactional(readOnly = true)
   public List<Todo> findAll(long userId) {
     return todoRepository.findAllByUser_IdOrderByCreatedAtDesc(userId);
   }
 
+  @Transactional(readOnly = true)
   public Page<Todo> findPage(long userId, String keyword, String sort, String direction,
       Long categoryId,
       Pageable pageable) {
@@ -47,6 +52,7 @@ public class TodoService {
     return new PageImpl<>(content, pageable, total);
   }
 
+  @Transactional(readOnly = true)
   public List<Todo> findForExport(long userId, String keyword, String sort, String direction,
       Long categoryId) {
     String safeSort = (sort == null || sort.isBlank()) ? "createdAt" : sort;
@@ -60,6 +66,7 @@ public class TodoService {
     return todoMapper.search(safeKeyword, userId, safeSort, safeDirection, categoryId, limit, 0);
   }
 
+  @Transactional(readOnly = true)
   public List<Todo> findForExportByIds(long userId, List<Long> ids) {
     if (ids == null || ids.isEmpty()) {
       return List.of();
@@ -81,6 +88,7 @@ public class TodoService {
     return todos;
   }
 
+  @Transactional(readOnly = true)
   public Optional<Todo> findById(long id) {
     return todoRepository.findById(id);
   }
@@ -99,13 +107,15 @@ public class TodoService {
     );
   }
 
-  @Transactional
+  @Transactional(rollbackFor = Exception.class, noRollbackFor = BusinessException.class)
   public Todo create(long userId, TodoForm form) {
     Todo todo = toEntity(userId, form);
-    return todoRepository.save(todo);
+    Todo saved = todoRepository.save(todo);
+    auditLogService.record("TODO_CREATE", "todoId=" + saved.getId() + ", userId=" + userId);
+    return saved;
   }
 
-  @Transactional
+  @Transactional(rollbackFor = Exception.class, noRollbackFor = BusinessException.class)
   public Todo update(long id, TodoForm form) {
     Todo todo = todoRepository.findById(id)
         .orElseThrow(() -> new IllegalArgumentException("Todo not found: " + id));
@@ -117,32 +127,38 @@ public class TodoService {
     todo.setCategory(resolveCategory(form.getCategoryId()));
     todo.setCompleted(Boolean.TRUE.equals(form.getCompleted()));
     todo.setVersion(form.getVersion());
-    return todoRepository.save(todo);
+    Todo saved = todoRepository.save(todo);
+    auditLogService.record("TODO_UPDATE", "todoId=" + saved.getId());
+    return saved;
   }
 
-  @Transactional
+  @Transactional(rollbackFor = Exception.class, noRollbackFor = BusinessException.class)
   public void deleteById(long id) {
     if (!todoRepository.existsById(id)) {
       throw new IllegalArgumentException("Todo not found: " + id);
     }
     todoRepository.deleteById(id);
+    auditLogService.record("TODO_DELETE", "todoId=" + id);
   }
 
-  @Transactional
+  @Transactional(rollbackFor = Exception.class, noRollbackFor = BusinessException.class)
   public int deleteByIds(long userId, List<Long> ids) {
     if (ids == null || ids.isEmpty()) {
       return 0;
     }
-    return todoMapper.deleteByIds(ids, userId);
+    int deleted = todoMapper.deleteByIds(ids, userId);
+    auditLogService.record("TODO_BULK_DELETE", "count=" + deleted + ", userId=" + userId);
+    return deleted;
   }
 
-  @Transactional
+  @Transactional(rollbackFor = Exception.class, noRollbackFor = BusinessException.class)
   public boolean toggleCompleted(long id) {
     Todo todo = todoRepository.findById(id)
         .orElseThrow(() -> new IllegalArgumentException("Todo not found: " + id));
     boolean newValue = !Boolean.TRUE.equals(todo.getCompleted());
     todo.setCompleted(newValue);
     todoRepository.save(todo);
+    auditLogService.record("TODO_TOGGLE", "todoId=" + id + ", completed=" + newValue);
     return newValue;
   }
 
