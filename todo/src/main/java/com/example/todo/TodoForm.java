@@ -41,4 +41,12 @@ public class TodoForm {
   private Boolean completed;
 
   private Long version;
+
+  private java.util.List<String> attachmentOriginalFilenames;
+
+  private java.util.List<String> attachmentStoredFilenames;
+
+  private java.util.List<String> attachmentContentTypes;
+
+  private java.util.List<Long> attachmentSizes;
 }

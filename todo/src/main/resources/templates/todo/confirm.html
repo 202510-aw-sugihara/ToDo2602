@@ -41,6 +41,23 @@
                 -
               </span>
             </dd>
+            <dt class="col-sm-3">添付ファイル</dt>
+            <dd class="col-sm-9">
+              <span th:if="${todoForm.attachmentOriginalFilenames == null || #lists.isEmpty(todoForm.attachmentOriginalFilenames)}">-</span>
+              <ul class="list-unstyled mb-0"
+                  th:if="${todoForm.attachmentOriginalFilenames != null && !#lists.isEmpty(todoForm.attachmentOriginalFilenames)}">
+                <li th:each="name,stat : ${todoForm.attachmentOriginalFilenames}" class="mb-1">
+                  <span th:text="${name}">file</span>
+                  <button type="button"
+                          class="btn btn-sm btn-outline-primary ms-2 attachment-action"
+                          th:attr="data-stored=${todoForm.attachmentStoredFilenames[stat.index]},
+                                   data-name=${name},
+                                   data-type=${todoForm.attachmentContentTypes[stat.index]}">
+                    プレビュー/ダウンロード
+                  </button>
+                </li>
+              </ul>
+            </dd>
           </dl>
           <div class="d-flex gap-2">
             <form th:action="@{/todos/back}" th:object="${todoForm}" method="post">
@@ -50,6 +67,10 @@
               <input type="hidden" th:field="*{dueDate}" />
               <input type="hidden" th:field="*{priority}" />
               <input type="hidden" th:field="*{categoryId}" />
+              <input type="hidden" th:each="v : ${todoForm.attachmentOriginalFilenames}" th:name="attachmentOriginalFilenames" th:value="${v}" />
+              <input type="hidden" th:each="v : ${todoForm.attachmentStoredFilenames}" th:name="attachmentStoredFilenames" th:value="${v}" />
+              <input type="hidden" th:each="v : ${todoForm.attachmentContentTypes}" th:name="attachmentContentTypes" th:value="${v}" />
+              <input type="hidden" th:each="v : ${todoForm.attachmentSizes}" th:name="attachmentSizes" th:value="${v}" />
               <button class="btn btn-outline-secondary" type="submit">入力に戻る</button>
             </form>
             <form th:action="@{/todos/complete}" th:object="${todoForm}" method="post">
@@ -59,11 +80,117 @@
               <input type="hidden" th:field="*{dueDate}" />
               <input type="hidden" th:field="*{priority}" />
               <input type="hidden" th:field="*{categoryId}" />
+              <input type="hidden" th:each="v : ${todoForm.attachmentOriginalFilenames}" th:name="attachmentOriginalFilenames" th:value="${v}" />
+              <input type="hidden" th:each="v : ${todoForm.attachmentStoredFilenames}" th:name="attachmentStoredFilenames" th:value="${v}" />
+              <input type="hidden" th:each="v : ${todoForm.attachmentContentTypes}" th:name="attachmentContentTypes" th:value="${v}" />
+              <input type="hidden" th:each="v : ${todoForm.attachmentSizes}" th:name="attachmentSizes" th:value="${v}" />
               <button class="btn btn-primary" type="submit">登録</button>
             </form>
           </div>
         </div>
       </div>
     </main>
+
+    <div id="attachment-modal" class="modal-backdrop" style="display: none;">
+      <div class="modal-dialog-centered">
+        <div class="modal-content p-3">
+          <h5 class="mb-2">添付ファイル</h5>
+          <p class="mb-3" id="attachment-filename">file</p>
+          <div class="d-flex gap-2 justify-content-end">
+            <button type="button" class="btn btn-outline-secondary" id="attachment-cancel">キャンセル</button>
+            <button type="button" class="btn btn-outline-primary" id="attachment-preview">プレビュー</button>
+            <button type="button" class="btn btn-primary" id="attachment-download">ダウンロード</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <style>
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1050;
+      }
+      .modal-dialog-centered {
+        max-width: 480px;
+        width: calc(100% - 2rem);
+      }
+      .modal-content {
+        background: #fff;
+        color: #212529;
+        border-radius: 12px;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+      }
+    </style>
+    <script>
+      (() => {
+        const modal = document.getElementById("attachment-modal");
+        const filename = document.getElementById("attachment-filename");
+        const btnPreview = document.getElementById("attachment-preview");
+        const btnDownload = document.getElementById("attachment-download");
+        const btnCancel = document.getElementById("attachment-cancel");
+        const triggers = Array.from(document.querySelectorAll(".attachment-action"));
+        if (!modal || triggers.length === 0) return;
+
+        let current = null;
+
+        const buildUrl = (download) => {
+          const stored = current?.stored;
+          const name = current?.name || "file";
+          const type = current?.type || "";
+          const params = new URLSearchParams();
+          params.set("name", name);
+          if (type) params.set("contentType", type);
+          params.set("download", String(download));
+          return `/todos/attachments/temp/${encodeURIComponent(stored)}?${params.toString()}`;
+        };
+
+        const buildPreviewPageUrl = () => {
+          const stored = current?.stored;
+          const name = current?.name || "file";
+          const type = current?.type || "";
+          const params = new URLSearchParams();
+          params.set("name", name);
+          if (type) params.set("contentType", type);
+          return `/todos/attachments/temp/${encodeURIComponent(stored)}/preview?${params.toString()}`;
+        };
+
+        triggers.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            current = {
+              stored: btn.getAttribute("data-stored"),
+              name: btn.getAttribute("data-name") || "file",
+              type: btn.getAttribute("data-type") || "",
+            };
+            filename.textContent = current.name;
+            modal.style.display = "flex";
+          });
+        });
+
+        btnCancel.addEventListener("click", () => {
+          modal.style.display = "none";
+        });
+
+        btnPreview.addEventListener("click", () => {
+          if (!current) return;
+          window.open(buildPreviewPageUrl(), "_blank", "width=900,height=700");
+        });
+
+        btnDownload.addEventListener("click", () => {
+          if (!current) return;
+          window.location.href = buildUrl(true);
+          modal.style.display = "none";
+        });
+
+        modal.addEventListener("click", (e) => {
+          if (e.target === modal) {
+            modal.style.display = "none";
+          }
+        });
+      })();
+    </script>
   </body>
 </html>

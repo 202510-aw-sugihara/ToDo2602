@@ -22,10 +22,11 @@
       <div class="card shadow-sm">
         <div class="card-body">
           <p class="mb-3">
-            <span th:if="${title != null}">
+            <span th:if="${message != null}" th:text="${message}">完了しました。</span>
+            <span th:if="${message == null and title != null}">
               「<strong th:text="${title}">タイトル</strong>」を登録しました。
             </span>
-            <span th:if="${title == null}">登録が完了しました。</span>
+            <span th:if="${message == null and title == null}">登録が完了しました。</span>
           </p>
           <a class="btn btn-outline-secondary" th:href="@{/todos}">一覧に戻る</a>
         </div>

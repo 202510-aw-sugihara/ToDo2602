@@ -7,10 +7,13 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.core.io.Resource;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -29,6 +32,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.multipart.MultipartFile;
 
 @Controller
 @RequestMapping("/todos")
@@ -37,12 +41,18 @@ public class TodoController {
   private final TodoService todoService;
   private final CategoryRepository categoryRepository;
   private final AppUserRepository appUserRepository;
+  private final TodoAttachmentService todoAttachmentService;
+  private final FileStorageService fileStorageService;
+  private static final Pattern STORED_NAME_PATTERN = Pattern.compile("^[a-fA-F0-9]{32}.*$");
 
   public TodoController(TodoService todoService, CategoryRepository categoryRepository,
-      AppUserRepository appUserRepository) {
+      AppUserRepository appUserRepository, TodoAttachmentService todoAttachmentService,
+      FileStorageService fileStorageService) {
     this.todoService = todoService;
     this.categoryRepository = categoryRepository;
     this.appUserRepository = appUserRepository;
+    this.todoAttachmentService = todoAttachmentService;
+    this.fileStorageService = fileStorageService;
   }
 
   @ModelAttribute("categories")
@@ -137,7 +147,36 @@ public class TodoController {
   }
 
   @PostMapping("/confirm")
-  public String confirm(@Valid @ModelAttribute("todoForm") TodoForm form, BindingResult bindingResult) {
+  public String confirm(@Valid @ModelAttribute("todoForm") TodoForm form,
+      BindingResult bindingResult,
+      @RequestParam(name = "files", required = false) List<MultipartFile> files) {
+    if (files != null && files.stream().anyMatch(f -> f != null && !f.isEmpty())) {
+      if (form.getAttachmentStoredFilenames() != null) {
+        for (String stored : form.getAttachmentStoredFilenames()) {
+          if (stored != null && !stored.isBlank()) {
+            fileStorageService.delete(stored);
+          }
+        }
+      }
+      java.util.ArrayList<String> originals = new java.util.ArrayList<>();
+      java.util.ArrayList<String> storedNames = new java.util.ArrayList<>();
+      java.util.ArrayList<String> types = new java.util.ArrayList<>();
+      java.util.ArrayList<Long> sizes = new java.util.ArrayList<>();
+      for (MultipartFile file : files) {
+        if (file == null || file.isEmpty()) {
+          continue;
+        }
+        FileStorageService.StoredFile stored = fileStorageService.store(file);
+        originals.add(stored.originalFilename());
+        storedNames.add(stored.storedFilename());
+        types.add(stored.contentType());
+        sizes.add(stored.size());
+      }
+      form.setAttachmentOriginalFilenames(originals);
+      form.setAttachmentStoredFilenames(storedNames);
+      form.setAttachmentContentTypes(types);
+      form.setAttachmentSizes(sizes);
+    }
     if (bindingResult.hasErrors()) {
       return "todo/new";
     }
@@ -155,7 +194,8 @@ public class TodoController {
       RedirectAttributes redirectAttributes,
       @AuthenticationPrincipal UserDetails userDetails) {
     long userId = requireUserId(userDetails);
-    todoService.create(userId, form);
+    Todo created = todoService.create(userId, form);
+    todoAttachmentService.attachStoredList(created, form);
     redirectAttributes.addFlashAttribute("successMessage", "登録が完了しました。");
     return "redirect:/todos";
   }
@@ -169,6 +209,7 @@ public class TodoController {
       throw new TodoNotFoundException("指定されたToDoが見つかりませんでした。");
     }
     ensureOwner(todo, requireUserId(userDetails));
+    model.addAttribute("attachments", todoAttachmentService.findByTodoId(todo.getId()));
     model.addAttribute("todo", todo);
     return "todo/detail";
   }
@@ -179,6 +220,7 @@ public class TodoController {
     Todo todo = todoService.findById(id)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     ensureOwner(todo, requireUserId(userDetails));
+    model.addAttribute("attachments", todoAttachmentService.findByTodoId(todo.getId()));
     model.addAttribute("todoForm", todoService.toForm(todo));
     return "todo/edit";
   }
@@ -189,7 +231,8 @@ public class TodoController {
       BindingResult bindingResult,
       Model model,
       RedirectAttributes redirectAttributes,
-      @AuthenticationPrincipal UserDetails userDetails) {
+      @AuthenticationPrincipal UserDetails userDetails,
+      @RequestParam(name = "files", required = false) List<MultipartFile> files) {
 
     if (bindingResult.hasErrors()) {
       return "todo/edit";
@@ -200,6 +243,14 @@ public class TodoController {
           .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
       ensureOwner(existing, requireUserId(userDetails));
       todoService.update(id, form);
+      if (files != null) {
+        for (MultipartFile file : files) {
+          if (file == null || file.isEmpty()) {
+            continue;
+          }
+          todoAttachmentService.upload(existing, file);
+        }
+      }
     } catch (OptimisticLockingFailureException ex) {
       model.addAttribute("errorMessage", "ほかのユーザーが更新しました。もう一度やり直してください。");
       return "todo/edit";
@@ -208,7 +259,15 @@ public class TodoController {
     }
 
     redirectAttributes.addFlashAttribute("successMessage", "更新が完了しました。");
-    return "redirect:/todos";
+    return "redirect:/todos/update-complete?title=" + java.net.URLEncoder.encode(form.getTitle(), StandardCharsets.UTF_8);
+  }
+
+  @GetMapping("/update-complete")
+  public String updateComplete(@RequestParam(name = "title", required = false) String title,
+      Model model) {
+    model.addAttribute("title", title);
+    model.addAttribute("message", "更新が完了しました。");
+    return "todo/complete";
   }
 
   @DeleteMapping("/{id:\\d+}")
@@ -225,6 +284,141 @@ public class TodoController {
       redirectAttributes.addFlashAttribute("errorMessage", "削除に失敗しました。");
     }
     return "redirect:/todos";
+  }
+
+  @PostMapping("/{id:\\d+}/attachments")
+  public String uploadAttachment(@PathVariable("id") long id,
+      @RequestParam("file") MultipartFile file,
+      @RequestParam(name = "redirect", required = false) String redirect,
+      RedirectAttributes redirectAttributes,
+      @AuthenticationPrincipal UserDetails userDetails) {
+    Todo todo = todoService.findById(id)
+        .orElseThrow(() -> new TodoNotFoundException("指定されたToDoが見つかりませんでした。"));
+    ensureOwner(todo, requireUserId(userDetails));
+    if (file == null || file.isEmpty()) {
+      redirectAttributes.addFlashAttribute("errorMessage", "ファイルが選択されていません。");
+      if ("edit".equalsIgnoreCase(redirect)) {
+        return "redirect:/todos/" + id + "/edit";
+      }
+      return "redirect:/todos/" + id;
+    }
+    todoAttachmentService.upload(todo, file);
+    redirectAttributes.addFlashAttribute("successMessage", "添付ファイルをアップロードしました。");
+    if ("edit".equalsIgnoreCase(redirect)) {
+      return "redirect:/todos/" + id + "/edit";
+    }
+    return "redirect:/todos/" + id;
+  }
+
+  @GetMapping("/{todoId:\\d+}/attachments/{attachmentId:\\d+}")
+  public ResponseEntity<Resource> downloadAttachment(@PathVariable("todoId") long todoId,
+      @PathVariable("attachmentId") long attachmentId,
+      @AuthenticationPrincipal UserDetails userDetails) {
+    return attachmentResource(todoId, attachmentId, true, userDetails);
+  }
+
+  @GetMapping("/{todoId:\\d+}/attachments/{attachmentId:\\d+}/content")
+  public ResponseEntity<Resource> attachmentContent(@PathVariable("todoId") long todoId,
+      @PathVariable("attachmentId") long attachmentId,
+      @RequestParam(name = "download", defaultValue = "false") boolean download,
+      @AuthenticationPrincipal UserDetails userDetails) {
+    return attachmentResource(todoId, attachmentId, download, userDetails);
+  }
+
+  @GetMapping("/{todoId:\\d+}/attachments/{attachmentId:\\d+}/preview")
+  public String previewAttachmentPage(@PathVariable("todoId") long todoId,
+      @PathVariable("attachmentId") long attachmentId,
+      Model model,
+      @AuthenticationPrincipal UserDetails userDetails) {
+    Todo todo = todoService.findById(todoId)
+        .orElseThrow(() -> new TodoNotFoundException("指定されたToDoが見つかりませんでした。"));
+    ensureOwner(todo, requireUserId(userDetails));
+    TodoAttachment attachment = todoAttachmentService.findById(attachmentId);
+    if (attachment == null || attachment.getTodo() == null
+        || !attachment.getTodo().getId().equals(todoId)) {
+      throw new TodoNotFoundException("添付ファイルが見つかりませんでした。");
+    }
+    String type = attachment.getContentType() == null || attachment.getContentType().isBlank()
+        ? MediaType.APPLICATION_OCTET_STREAM_VALUE
+        : attachment.getContentType();
+    String previewUrl = "/todos/" + todoId + "/attachments/" + attachmentId + "/content?download=false";
+    String downloadUrl = "/todos/" + todoId + "/attachments/" + attachmentId + "/content?download=true";
+    model.addAttribute("filename", attachment.getOriginalFilename());
+    model.addAttribute("contentType", type);
+    model.addAttribute("previewUrl", previewUrl);
+    model.addAttribute("downloadUrl", downloadUrl);
+    return "todo/attachment_preview";
+  }
+
+  @GetMapping("/attachments/temp/{stored}")
+  public ResponseEntity<Resource> previewTempAttachment(@PathVariable("stored") String stored,
+      @RequestParam(name = "name", required = false) String name,
+      @RequestParam(name = "contentType", required = false) String contentType,
+      @RequestParam(name = "download", defaultValue = "false") boolean download,
+      @AuthenticationPrincipal UserDetails userDetails) {
+    requireUserId(userDetails);
+    if (stored == null || stored.contains("..") || stored.contains("/") || stored.contains("\\")
+        || !STORED_NAME_PATTERN.matcher(stored).matches()) {
+      throw new TodoNotFoundException("添付ファイルが見つかりませんでした。");
+    }
+    Resource resource = fileStorageService.loadAsResource(stored);
+    String safeName = (name == null || name.isBlank()) ? stored : name;
+    String type = (contentType == null || contentType.isBlank())
+        ? MediaType.APPLICATION_OCTET_STREAM_VALUE
+        : contentType;
+    ContentDisposition disposition = download
+        ? ContentDisposition.attachment().filename(safeName, StandardCharsets.UTF_8).build()
+        : ContentDisposition.inline().filename(safeName, StandardCharsets.UTF_8).build();
+    return ResponseEntity.ok()
+        .contentType(MediaType.parseMediaType(type))
+        .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+        .body(resource);
+  }
+
+  @GetMapping("/attachments/temp/{stored}/preview")
+  public String previewTempAttachmentPage(@PathVariable("stored") String stored,
+      @RequestParam(name = "name", required = false) String name,
+      @RequestParam(name = "contentType", required = false) String contentType,
+      Model model,
+      @AuthenticationPrincipal UserDetails userDetails) {
+    requireUserId(userDetails);
+    if (stored == null || stored.contains("..") || stored.contains("/") || stored.contains("\\")
+        || !STORED_NAME_PATTERN.matcher(stored).matches()) {
+      throw new TodoNotFoundException("添付ファイルが見つかりませんでした。");
+    }
+    String safeName = (name == null || name.isBlank()) ? stored : name;
+    String type = (contentType == null || contentType.isBlank())
+        ? MediaType.APPLICATION_OCTET_STREAM_VALUE
+        : contentType;
+    String previewUrl = "/todos/attachments/temp/" + stored + "?name=" + java.net.URLEncoder.encode(safeName, StandardCharsets.UTF_8)
+        + "&contentType=" + java.net.URLEncoder.encode(type, StandardCharsets.UTF_8)
+        + "&download=false";
+    String downloadUrl = "/todos/attachments/temp/" + stored + "?name=" + java.net.URLEncoder.encode(safeName, StandardCharsets.UTF_8)
+        + "&contentType=" + java.net.URLEncoder.encode(type, StandardCharsets.UTF_8)
+        + "&download=true";
+    model.addAttribute("filename", safeName);
+    model.addAttribute("contentType", type);
+    model.addAttribute("previewUrl", previewUrl);
+    model.addAttribute("downloadUrl", downloadUrl);
+    return "todo/attachment_preview";
+  }
+
+  @DeleteMapping("/{todoId:\\d+}/attachments/{attachmentId:\\d+}")
+  public String deleteAttachment(@PathVariable("todoId") long todoId,
+      @PathVariable("attachmentId") long attachmentId,
+      RedirectAttributes redirectAttributes,
+      @AuthenticationPrincipal UserDetails userDetails) {
+    Todo todo = todoService.findById(todoId)
+        .orElseThrow(() -> new TodoNotFoundException("指定されたToDoが見つかりませんでした。"));
+    ensureOwner(todo, requireUserId(userDetails));
+    TodoAttachment attachment = todoAttachmentService.findById(attachmentId);
+    if (attachment == null || attachment.getTodo() == null
+        || !attachment.getTodo().getId().equals(todoId)) {
+      throw new TodoNotFoundException("添付ファイルが見つかりませんでした。");
+    }
+    todoAttachmentService.delete(attachment);
+    redirectAttributes.addFlashAttribute("successMessage", "添付ファイルを削除しました。");
+    return "redirect:/todos/" + todoId;
   }
 
   @PostMapping("/bulk-delete")
@@ -287,5 +481,32 @@ public class TodoController {
         || todo.getUser().getId().longValue() != userId) {
       throw new ResponseStatusException(HttpStatus.FORBIDDEN);
     }
+  }
+
+  private ResponseEntity<Resource> attachmentResource(long todoId, long attachmentId,
+      boolean download, UserDetails userDetails) {
+    Todo todo = todoService.findById(todoId)
+        .orElseThrow(() -> new TodoNotFoundException("指定されたToDoが見つかりませんでした。"));
+    ensureOwner(todo, requireUserId(userDetails));
+    TodoAttachment attachment = todoAttachmentService.findById(attachmentId);
+    if (attachment == null || attachment.getTodo() == null
+        || !attachment.getTodo().getId().equals(todoId)) {
+      throw new TodoNotFoundException("添付ファイルが見つかりませんでした。");
+    }
+    Resource resource = fileStorageService.loadAsResource(attachment.getStoredFilename());
+    String contentType = attachment.getContentType() != null && !attachment.getContentType().isBlank()
+        ? attachment.getContentType()
+        : MediaType.APPLICATION_OCTET_STREAM_VALUE;
+    ContentDisposition disposition = download
+        ? ContentDisposition.attachment()
+          .filename(attachment.getOriginalFilename(), StandardCharsets.UTF_8)
+          .build()
+        : ContentDisposition.inline()
+          .filename(attachment.getOriginalFilename(), StandardCharsets.UTF_8)
+          .build();
+    return ResponseEntity.ok()
+        .contentType(MediaType.parseMediaType(contentType))
+        .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+        .body(resource);
   }
 }

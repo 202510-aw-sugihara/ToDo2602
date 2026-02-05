@@ -47,8 +47,7 @@ public class TodoService {
         safeDirection,
         categoryId,
         pageable.getPageSize(),
-        (int) pageable.getOffset()
-    );
+        (int) pageable.getOffset());
     return new PageImpl<>(content, pageable, total);
   }
 
@@ -94,17 +93,17 @@ public class TodoService {
   }
 
   public TodoForm toForm(Todo todo) {
-    return new TodoForm(
-        todo.getId(),
-        todo.getAuthor(),
-        todo.getTitle(),
-        todo.getDescription(),
-        todo.getDueDate(),
-        todo.getPriority(),
-        todo.getCategory() != null ? todo.getCategory().getId() : null,
-        todo.getCompleted(),
-        todo.getVersion()
-    );
+    TodoForm form = new TodoForm();
+    form.setId(todo.getId());
+    form.setAuthor(todo.getAuthor());
+    form.setTitle(todo.getTitle());
+    form.setDetail(todo.getDescription());
+    form.setDueDate(todo.getDueDate());
+    form.setPriority(todo.getPriority());
+    form.setCategoryId(todo.getCategory() != null ? todo.getCategory().getId() : null);
+    form.setCompleted(todo.getCompleted());
+    form.setVersion(todo.getVersion());
+    return form;
   }
 
   @Transactional(rollbackFor = Exception.class, noRollbackFor = BusinessException.class)

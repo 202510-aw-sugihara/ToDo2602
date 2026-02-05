@@ -21,7 +21,8 @@
     <main class="container my-4">
       <div class="card shadow-sm">
         <div class="card-body">
-          <form th:action="@{/todos/confirm}" th:object="${todoForm}" method="post" class="vstack gap-3">
+          <form th:action="@{/todos/confirm}" th:object="${todoForm}" method="post"
+                enctype="multipart/form-data" class="vstack gap-3">
             <div>
               <label class="form-label">作成者</label>
               <input class="form-control" type="text" th:field="*{author}" />
@@ -71,13 +72,60 @@
                 <option th:each="c : ${categories}" th:value="${c.id}" th:text="${c.name}">カテゴリ</option>
               </select>
             </div>
-            <div class="d-flex gap-2">
-              <button class="btn btn-primary" type="submit">確認</button>
-              <a class="btn btn-outline-secondary" th:href="@{/todos}">戻る</a>
+            <div>
+              <label class="form-label">添付ファイル</label>
+              <div id="new-file-inputs" class="vstack gap-2">
+                <input class="form-control" type="file" name="files" />
+              </div>
+              <div class="form-text">ファイルを選択すると追加の入力欄が表示されます。</div>
+              <div class="mt-2" th:if="${todoForm.attachmentOriginalFilenames != null}">
+                現在選択:
+                <ul class="mb-0">
+                  <li th:each="name : ${todoForm.attachmentOriginalFilenames}" th:text="${name}">file</li>
+                </ul>
+              </div>
+              <input type="hidden" th:each="v : ${todoForm.attachmentOriginalFilenames}" th:name="attachmentOriginalFilenames" th:value="${v}" />
+              <input type="hidden" th:each="v : ${todoForm.attachmentStoredFilenames}" th:name="attachmentStoredFilenames" th:value="${v}" />
+              <input type="hidden" th:each="v : ${todoForm.attachmentContentTypes}" th:name="attachmentContentTypes" th:value="${v}" />
+              <input type="hidden" th:each="v : ${todoForm.attachmentSizes}" th:name="attachmentSizes" th:value="${v}" />
             </div>
-          </form>
-        </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary" type="submit">確認</button>
+            <a class="btn btn-outline-secondary" th:href="@{/todos}">戻る</a>
+          </div>
+        </form>
       </div>
-    </main>
-  </body>
+    </div>
+  </main>
+  <script>
+    (() => {
+      const container = document.getElementById("new-file-inputs");
+      if (!container) return;
+
+      const addInput = () => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.name = "files";
+        input.className = "form-control";
+        input.addEventListener("change", () => {
+          const inputs = Array.from(container.querySelectorAll("input[type='file']"));
+          const last = inputs[inputs.length - 1];
+          if (last === input && input.files && input.files.length > 0) {
+            addInput();
+          }
+        });
+        container.appendChild(input);
+      };
+
+      const first = container.querySelector("input[type='file']");
+      if (first) {
+        first.addEventListener("change", () => {
+          if (first.files && first.files.length > 0) {
+            addInput();
+          }
+        });
+      }
+    })();
+  </script>
+</body>
 </html>

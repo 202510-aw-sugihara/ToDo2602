@@ -36,6 +36,27 @@
               <span th:unless="${todo.completed}">未完了</span>
             </dd>
           </dl>
+          <div class="mb-4">
+            <h2 class="h6 mb-3">添付ファイル</h2>
+            <div th:if="${attachments == null or #lists.isEmpty(attachments)}" class="text-muted">
+              添付ファイルはありません。
+            </div>
+            <ul class="list-group mb-3" th:if="${attachments != null and !#lists.isEmpty(attachments)}">
+              <li class="list-group-item d-flex justify-content-between align-items-center"
+                  th:each="att : ${attachments}">
+                <div>
+                  <span th:text="${att.originalFilename}">file</span>
+                  <button type="button"
+                          class="btn btn-sm btn-outline-primary ms-2 attachment-action"
+                          th:attr="data-todo=${todo.id},
+                                   data-attachment=${att.id},
+                                   data-name=${att.originalFilename}">
+                    プレビュー/ダウンロード
+                  </button>
+                </div>
+              </li>
+            </ul>
+          </div>
           <div class="d-flex gap-2">
             <a class="btn btn-outline-secondary" th:href="@{/todos}">一覧に戻る</a>
             <a class="btn btn-primary" th:href="@{/todos/{id}/edit(id=${todo.id})}">編集</a>
@@ -43,5 +64,91 @@
         </div>
       </div>
     </main>
+
+    <div id="attachment-modal" class="modal-backdrop" style="display: none;">
+      <div class="modal-dialog-centered">
+        <div class="modal-content p-3">
+          <h5 class="mb-2">添付ファイル</h5>
+          <p class="mb-3" id="attachment-filename">file</p>
+          <div class="d-flex gap-2 justify-content-end">
+            <button type="button" class="btn btn-outline-secondary" id="attachment-cancel">キャンセル</button>
+            <button type="button" class="btn btn-outline-primary" id="attachment-preview">プレビュー</button>
+            <button type="button" class="btn btn-primary" id="attachment-download">ダウンロード</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <style>
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1050;
+      }
+      .modal-dialog-centered {
+        max-width: 480px;
+        width: calc(100% - 2rem);
+      }
+      .modal-content {
+        background: #fff;
+        color: #212529;
+        border-radius: 12px;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+      }
+    </style>
+    <script>
+      (() => {
+        const modal = document.getElementById("attachment-modal");
+        const filename = document.getElementById("attachment-filename");
+        const btnPreview = document.getElementById("attachment-preview");
+        const btnDownload = document.getElementById("attachment-download");
+        const btnCancel = document.getElementById("attachment-cancel");
+        const triggers = Array.from(document.querySelectorAll(".attachment-action"));
+        if (!modal || triggers.length === 0) return;
+
+        let current = null;
+
+        const previewPageUrl = (todoId, attachmentId) =>
+          `/todos/${todoId}/attachments/${attachmentId}/preview`;
+        const downloadUrl = (todoId, attachmentId) =>
+          `/todos/${todoId}/attachments/${attachmentId}`;
+
+        triggers.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            current = {
+              todoId: btn.getAttribute("data-todo"),
+              attachmentId: btn.getAttribute("data-attachment"),
+              name: btn.getAttribute("data-name") || "file",
+            };
+            filename.textContent = current.name;
+            modal.style.display = "flex";
+          });
+        });
+
+        btnCancel.addEventListener("click", () => {
+          modal.style.display = "none";
+        });
+
+        btnPreview.addEventListener("click", () => {
+          if (!current) return;
+          window.open(previewPageUrl(current.todoId, current.attachmentId), "_blank", "width=900,height=700");
+        });
+
+        btnDownload.addEventListener("click", () => {
+          if (!current) return;
+          window.location.href = downloadUrl(current.todoId, current.attachmentId);
+          modal.style.display = "none";
+        });
+
+        modal.addEventListener("click", (e) => {
+          if (e.target === modal) {
+            modal.style.display = "none";
+          }
+        });
+      })();
+    </script>
   </body>
 </html>
