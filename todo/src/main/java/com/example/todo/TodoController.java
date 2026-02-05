@@ -166,8 +166,7 @@ public class TodoController {
       @AuthenticationPrincipal UserDetails userDetails) {
     Todo todo = todoService.findById(id).orElse(null);
     if (todo == null) {
-      redirectAttributes.addFlashAttribute("errorMessage", "指定されたToDoが見つかりませんでした。");
-      return "redirect:/todos";
+      throw new TodoNotFoundException("指定されたToDoが見つかりませんでした。");
     }
     ensureOwner(todo, requireUserId(userDetails));
     model.addAttribute("todo", todo);
