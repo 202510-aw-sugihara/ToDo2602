@@ -14,26 +14,30 @@ public class TodoService {
   private final TodoRepository todoRepository;
   private final TodoMapper todoMapper;
   private final CategoryRepository categoryRepository;
+  private final AppUserRepository appUserRepository;
 
   public TodoService(TodoRepository todoRepository, TodoMapper todoMapper,
-      CategoryRepository categoryRepository) {
+      CategoryRepository categoryRepository, AppUserRepository appUserRepository) {
     this.todoRepository = todoRepository;
     this.todoMapper = todoMapper;
     this.categoryRepository = categoryRepository;
+    this.appUserRepository = appUserRepository;
   }
 
-  public List<Todo> findAll() {
-    return todoRepository.findAllByOrderByCreatedAtDesc();
+  public List<Todo> findAll(long userId) {
+    return todoRepository.findAllByUser_IdOrderByCreatedAtDesc(userId);
   }
 
-  public Page<Todo> findPage(String keyword, String sort, String direction, Long categoryId,
+  public Page<Todo> findPage(long userId, String keyword, String sort, String direction,
+      Long categoryId,
       Pageable pageable) {
     String safeSort = (sort == null || sort.isBlank()) ? "createdAt" : sort;
     String safeDirection = (direction == null || direction.isBlank()) ? "desc" : direction;
     String safeKeyword = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
-    long total = todoMapper.count(safeKeyword, categoryId);
+    long total = todoMapper.count(safeKeyword, userId, categoryId);
     List<Todo> content = todoMapper.search(
         safeKeyword,
+        userId,
         safeSort,
         safeDirection,
         categoryId,
@@ -43,23 +47,25 @@ public class TodoService {
     return new PageImpl<>(content, pageable, total);
   }
 
-  public List<Todo> findForExport(String keyword, String sort, String direction, Long categoryId) {
+  public List<Todo> findForExport(long userId, String keyword, String sort, String direction,
+      Long categoryId) {
     String safeSort = (sort == null || sort.isBlank()) ? "createdAt" : sort;
     String safeDirection = (direction == null || direction.isBlank()) ? "desc" : direction;
     String safeKeyword = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
-    long total = todoMapper.count(safeKeyword, categoryId);
+    long total = todoMapper.count(safeKeyword, userId, categoryId);
     if (total <= 0) {
       return List.of();
     }
     int limit = total > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) total;
-    return todoMapper.search(safeKeyword, safeSort, safeDirection, categoryId, limit, 0);
+    return todoMapper.search(safeKeyword, userId, safeSort, safeDirection, categoryId, limit, 0);
   }
 
-  public List<Todo> findForExportByIds(List<Long> ids) {
+  public List<Todo> findForExportByIds(long userId, List<Long> ids) {
     if (ids == null || ids.isEmpty()) {
       return List.of();
     }
     List<Todo> todos = todoRepository.findAllById(ids);
+    todos.removeIf(todo -> todo.getUser() == null || !userIdEquals(todo, userId));
     todos.sort((a, b) -> {
       if (a.getCreatedAt() == null && b.getCreatedAt() == null) {
         return 0;
@@ -94,8 +100,8 @@ public class TodoService {
   }
 
   @Transactional
-  public Todo create(TodoForm form) {
-    Todo todo = toEntity(form);
+  public Todo create(long userId, TodoForm form) {
+    Todo todo = toEntity(userId, form);
     return todoRepository.save(todo);
   }
 
@@ -123,11 +129,11 @@ public class TodoService {
   }
 
   @Transactional
-  public int deleteByIds(List<Long> ids) {
+  public int deleteByIds(long userId, List<Long> ids) {
     if (ids == null || ids.isEmpty()) {
       return 0;
     }
-    return todoMapper.deleteByIds(ids);
+    return todoMapper.deleteByIds(ids, userId);
   }
 
   @Transactional
@@ -140,7 +146,7 @@ public class TodoService {
     return newValue;
   }
 
-  private Todo toEntity(TodoForm form) {
+  private Todo toEntity(long userId, TodoForm form) {
     return Todo.builder()
         .author(form.getAuthor())
         .title(form.getTitle())
@@ -148,6 +154,7 @@ public class TodoService {
         .dueDate(form.getDueDate())
         .priority(form.getPriority() != null ? form.getPriority() : Priority.MEDIUM)
         .category(resolveCategory(form.getCategoryId()))
+        .user(resolveUser(userId))
         .completed(false)
         .build();
   }
@@ -157,5 +164,15 @@ public class TodoService {
       return null;
     }
     return categoryRepository.findById(categoryId).orElse(null);
+  }
+
+  private AppUser resolveUser(long userId) {
+    return appUserRepository.findById(userId)
+        .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+  }
+
+  private boolean userIdEquals(Todo todo, long userId) {
+    return todo.getUser() != null && todo.getUser().getId() != null
+        && todo.getUser().getId().longValue() == userId;
   }
 }

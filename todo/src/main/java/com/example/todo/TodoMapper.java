@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Param;
 public interface TodoMapper {
 
   List<Todo> search(@Param("keyword") String keyword,
+      @Param("userId") Long userId,
       @Param("sort") String sort,
       @Param("direction") String direction,
       @Param("categoryId") Long categoryId,
@@ -15,7 +16,9 @@ public interface TodoMapper {
       @Param("offset") int offset);
 
   long count(@Param("keyword") String keyword,
+      @Param("userId") Long userId,
       @Param("categoryId") Long categoryId);
 
-  int deleteByIds(@Param("ids") List<Long> ids);
+  int deleteByIds(@Param("ids") List<Long> ids,
+      @Param("userId") Long userId);
 }

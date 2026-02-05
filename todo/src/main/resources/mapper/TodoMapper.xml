@@ -3,7 +3,23 @@
   PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.example.todo.TodoMapper">
-  <select id="search" parameterType="map" resultType="com.example.todo.Todo">
+  <resultMap id="TodoResultMap" type="com.example.todo.Todo">
+    <id column="id" property="id"/>
+    <result column="author" property="author"/>
+    <result column="title" property="title"/>
+    <result column="description" property="description"/>
+    <result column="due_date" property="dueDate"/>
+    <result column="priority" property="priority"/>
+    <result column="completed" property="completed"/>
+    <result column="created_at" property="createdAt"/>
+    <result column="updated_at" property="updatedAt"/>
+    <result column="version" property="version"/>
+    <association property="user" javaType="com.example.todo.AppUser">
+      <id column="user_id" property="id"/>
+    </association>
+  </resultMap>
+
+  <select id="search" parameterType="map" resultMap="TodoResultMap">
     SELECT
       id,
       author,
@@ -14,9 +30,13 @@
       completed,
       created_at,
       updated_at,
-      version
+      version,
+      user_id
     FROM todos
     <where>
+      <if test="userId != null">
+        AND user_id = #{userId}
+      </if>
       <if test="keyword != null and keyword != ''">
         AND title LIKE CONCAT('%', #{keyword}, '%')
       </if>
@@ -42,6 +62,9 @@
     SELECT COUNT(*)
     FROM todos
     <where>
+      <if test="userId != null">
+        AND user_id = #{userId}
+      </if>
       <if test="keyword != null and keyword != ''">
         AND title LIKE CONCAT('%', #{keyword}, '%')
       </if>
@@ -57,5 +80,8 @@
     <foreach collection="ids" item="id" open="(" separator="," close=")">
       #{id}
     </foreach>
+    <if test="userId != null">
+      AND user_id = #{userId}
+    </if>
   </delete>
 </mapper>

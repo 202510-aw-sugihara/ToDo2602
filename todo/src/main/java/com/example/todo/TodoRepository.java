@@ -8,27 +8,22 @@ import org.springframework.data.repository.query.Param;
 
 public interface TodoRepository extends JpaRepository<Todo, Long> {
 
-  // 完了状態でフィルタリング
   List<Todo> findByCompleted(boolean completed);
 
-  // タイトルで部分一致検索
   List<Todo> findByTitleContainingIgnoreCase(String keyword);
 
-  // 期限日が今日以前のもの
   List<Todo> findByDueDateLessThanEqual(LocalDate date);
 
-  // 優先度でソート
   List<Todo> findAllByOrderByPriorityAsc();
 
-  // 作成日時の新しい順でソート
   List<Todo> findAllByOrderByCreatedAtDesc();
 
-  // @Queryアノテーションの例（完了状態 + タイトル部分一致）
   @Query("select t from Todo t where t.completed = :completed and t.title like %:keyword%")
   List<Todo> searchByStatusAndTitle(@Param("completed") boolean completed,
       @Param("keyword") String keyword);
 
-  // タイトルでLIKE検索
   @Query("select t from Todo t where t.title like %:keyword%")
   List<Todo> searchByTitle(@Param("keyword") String keyword);
+
+  List<Todo> findAllByUser_IdOrderByCreatedAtDesc(Long userId);
 }

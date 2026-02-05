@@ -15,6 +15,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -34,10 +36,13 @@ public class TodoController {
 
   private final TodoService todoService;
   private final CategoryRepository categoryRepository;
+  private final AppUserRepository appUserRepository;
 
-  public TodoController(TodoService todoService, CategoryRepository categoryRepository) {
+  public TodoController(TodoService todoService, CategoryRepository categoryRepository,
+      AppUserRepository appUserRepository) {
     this.todoService = todoService;
     this.categoryRepository = categoryRepository;
+    this.appUserRepository = appUserRepository;
   }
 
   @ModelAttribute("categories")
@@ -45,16 +50,17 @@ public class TodoController {
     return categoryRepository.findAll();
   }
 
-  // ToDo一覧画面を表示します。
   @GetMapping
   public String list(@RequestParam(required = false) String keyword,
       @RequestParam(required = false) String sort,
       @RequestParam(required = false) String direction,
       @RequestParam(required = false) Long categoryId,
       @PageableDefault(size = 10) Pageable pageable,
+      @AuthenticationPrincipal UserDetails userDetails,
       Model model) {
 
-    Page<Todo> page = todoService.findPage(keyword, sort, direction, categoryId, pageable);
+    long userId = requireUserId(userDetails);
+    Page<Todo> page = todoService.findPage(userId, keyword, sort, direction, categoryId, pageable);
     model.addAttribute("todos", page.getContent());
     model.addAttribute("page", page);
     model.addAttribute("keyword", keyword == null ? "" : keyword);
@@ -76,10 +82,12 @@ public class TodoController {
       @RequestParam(required = false) String sort,
       @RequestParam(required = false) String direction,
       @RequestParam(required = false) Long categoryId,
-      @RequestParam(required = false) List<Long> ids) {
+      @RequestParam(required = false) List<Long> ids,
+      @AuthenticationPrincipal UserDetails userDetails) {
+    long userId = requireUserId(userDetails);
     List<Todo> todos = (ids != null && !ids.isEmpty())
-        ? todoService.findForExportByIds(ids)
-        : todoService.findForExport(keyword, sort, direction, categoryId);
+        ? todoService.findForExportByIds(userId, ids)
+        : todoService.findForExport(userId, keyword, sort, direction, categoryId);
     if (todos.isEmpty()) {
       return ResponseEntity.noContent().build();
     }
@@ -120,7 +128,6 @@ public class TodoController {
     return needsQuote ? "\"" + escaped + "\"" : escaped;
   }
 
-  // ToDo新規作成画面を表示します。
   @GetMapping("/new")
   public String newTodo(@ModelAttribute("todoForm") TodoForm form) {
     if (form.getDueDate() == null) {
@@ -129,7 +136,6 @@ public class TodoController {
     return "todo/new";
   }
 
-  // フォーム送信を受け取り、確認画面に遷移します。
   @PostMapping("/confirm")
   public String confirm(@Valid @ModelAttribute("todoForm") TodoForm form, BindingResult bindingResult) {
     if (bindingResult.hasErrors()) {
@@ -138,58 +144,65 @@ public class TodoController {
     return "todo/confirm";
   }
 
-  // 確認画面から入力画面へ戻る際、入力値を保持してリダイレクトします。
   @PostMapping("/back")
   public String back(@ModelAttribute("todoForm") TodoForm form, RedirectAttributes redirectAttributes) {
     redirectAttributes.addFlashAttribute("todoForm", form);
     return "redirect:/todos/new";
   }
 
-  // 確認画面から登録を行い、一覧画面へリダイレクトします。
   @PostMapping("/complete")
-  public String complete(@ModelAttribute("todoForm") TodoForm form, RedirectAttributes redirectAttributes) {
-    todoService.create(form);
+  public String complete(@ModelAttribute("todoForm") TodoForm form,
+      RedirectAttributes redirectAttributes,
+      @AuthenticationPrincipal UserDetails userDetails) {
+    long userId = requireUserId(userDetails);
+    todoService.create(userId, form);
     redirectAttributes.addFlashAttribute("successMessage", "登録が完了しました。");
     return "redirect:/todos";
   }
 
-  // 指定IDのToDo詳細画面を表示します。
   @GetMapping("/{id:\\d+}")
-  public String detail(@PathVariable("id") long id, Model model, RedirectAttributes redirectAttributes) {
+  public String detail(@PathVariable("id") long id, Model model,
+      RedirectAttributes redirectAttributes,
+      @AuthenticationPrincipal UserDetails userDetails) {
     Todo todo = todoService.findById(id).orElse(null);
     if (todo == null) {
       redirectAttributes.addFlashAttribute("errorMessage", "指定されたToDoが見つかりませんでした。");
       return "redirect:/todos";
     }
+    ensureOwner(todo, requireUserId(userDetails));
     model.addAttribute("todo", todo);
     return "todo/detail";
   }
 
-  // 指定IDのToDo編集画面を表示します。
   @GetMapping("/{id:\\d+}/edit")
-  public String edit(@PathVariable("id") long id, Model model) {
+  public String edit(@PathVariable("id") long id, Model model,
+      @AuthenticationPrincipal UserDetails userDetails) {
     Todo todo = todoService.findById(id)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    ensureOwner(todo, requireUserId(userDetails));
     model.addAttribute("todoForm", todoService.toForm(todo));
     return "todo/edit";
   }
 
-  // 指定IDのToDoを更新し、一覧画面へリダイレクトします。
   @PostMapping("/{id:\\d+}/update")
   public String update(@PathVariable("id") long id,
       @Valid @ModelAttribute("todoForm") TodoForm form,
       BindingResult bindingResult,
       Model model,
-      RedirectAttributes redirectAttributes) {
+      RedirectAttributes redirectAttributes,
+      @AuthenticationPrincipal UserDetails userDetails) {
 
     if (bindingResult.hasErrors()) {
       return "todo/edit";
     }
 
     try {
+      Todo existing = todoService.findById(id)
+          .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+      ensureOwner(existing, requireUserId(userDetails));
       todoService.update(id, form);
     } catch (OptimisticLockingFailureException ex) {
-      model.addAttribute("errorMessage", "他のユーザーが更新しています。再読み込みしてやり直してください。");
+      model.addAttribute("errorMessage", "ほかのユーザーが更新しました。もう一度やり直してください。");
       return "todo/edit";
     } catch (IllegalArgumentException ex) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
@@ -199,10 +212,14 @@ public class TodoController {
     return "redirect:/todos";
   }
 
-  // 指定IDのToDoを削除し、一覧画面へリダイレクトします。
   @DeleteMapping("/{id:\\d+}")
-  public String delete(@PathVariable("id") long id, RedirectAttributes redirectAttributes) {
+  public String delete(@PathVariable("id") long id,
+      RedirectAttributes redirectAttributes,
+      @AuthenticationPrincipal UserDetails userDetails) {
     try {
+      Todo existing = todoService.findById(id)
+          .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+      ensureOwner(existing, requireUserId(userDetails));
       todoService.deleteById(id);
       redirectAttributes.addFlashAttribute("successMessage", "ToDoを削除しました。");
     } catch (IllegalArgumentException ex) {
@@ -211,11 +228,12 @@ public class TodoController {
     return "redirect:/todos";
   }
 
-  // 選択したToDoを一括削除し、一覧画面へリダイレクトします。
   @PostMapping("/bulk-delete")
   public String bulkDelete(@RequestParam(name = "ids", required = false) List<Long> ids,
-      RedirectAttributes redirectAttributes) {
-    int deleted = todoService.deleteByIds(ids);
+      RedirectAttributes redirectAttributes,
+      @AuthenticationPrincipal UserDetails userDetails) {
+    long userId = requireUserId(userDetails);
+    int deleted = todoService.deleteByIds(userId, ids);
     if (deleted > 0) {
       redirectAttributes.addFlashAttribute("successMessage", "選択したToDoを削除しました。");
     } else {
@@ -224,27 +242,51 @@ public class TodoController {
     return "redirect:/todos";
   }
 
-  // 指定IDのToDoの完了状態を反転します。
   @PostMapping("/{id:\\d+}/toggle")
   public Object toggle(@PathVariable("id") long id,
       HttpServletRequest request,
-      RedirectAttributes redirectAttributes) {
+      RedirectAttributes redirectAttributes,
+      @AuthenticationPrincipal UserDetails userDetails) {
 
     boolean ajax = "XMLHttpRequest".equals(request.getHeader("X-Requested-With"));
 
     try {
+      Todo existing = todoService.findById(id)
+          .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+      ensureOwner(existing, requireUserId(userDetails));
       boolean completed = todoService.toggleCompleted(id);
       if (ajax) {
         return ResponseEntity.ok(Map.of("completed", completed));
       }
       redirectAttributes.addFlashAttribute("successMessage", "完了状態を更新しました。");
       return "redirect:/todos";
+    } catch (ResponseStatusException ex) {
+      if (ajax) {
+        return ResponseEntity.status(ex.getStatusCode()).body(Map.of("error", "forbidden"));
+      }
+      throw ex;
     } catch (IllegalArgumentException ex) {
       if (ajax) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "not_found"));
       }
       redirectAttributes.addFlashAttribute("errorMessage", "対象のToDoが見つかりませんでした。");
       return "redirect:/todos";
+    }
+  }
+
+  private long requireUserId(UserDetails userDetails) {
+    if (userDetails == null) {
+      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+    }
+    return appUserRepository.findByUsername(userDetails.getUsername())
+        .map(AppUser::getId)
+        .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+  }
+
+  private void ensureOwner(Todo todo, long userId) {
+    if (todo.getUser() == null || todo.getUser().getId() == null
+        || todo.getUser().getId().longValue() != userId) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN);
     }
   }
 }
