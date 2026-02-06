@@ -2,30 +2,35 @@ package com.example.todo;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface TodoRepository extends JpaRepository<Todo, Long> {
 
-  List<Todo> findByCompleted(boolean completed);
+  List<Todo> findByCompletedAndDeletedAtIsNull(boolean completed);
 
-  List<Todo> findByTitleContainingIgnoreCase(String keyword);
+  List<Todo> findByTitleContainingIgnoreCaseAndDeletedAtIsNull(String keyword);
 
-  List<Todo> findByDueDateLessThanEqual(LocalDate date);
+  List<Todo> findByDueDateLessThanEqualAndDeletedAtIsNull(LocalDate date);
 
-  List<Todo> findAllByOrderByPriorityAsc();
+  List<Todo> findAllByDeletedAtIsNullOrderByPriorityAsc();
 
-  List<Todo> findAllByOrderByCreatedAtDesc();
+  List<Todo> findAllByDeletedAtIsNullOrderByCreatedAtDesc();
 
-  List<Todo> findAllByDueDateBetweenAndCompletedFalse(LocalDate start, LocalDate end);
+  List<Todo> findAllByDueDateBetweenAndCompletedFalseAndDeletedAtIsNull(LocalDate start, LocalDate end);
 
-  @Query("select t from Todo t where t.completed = :completed and t.title like %:keyword%")
+  @Query("select t from Todo t where t.deletedAt is null and t.completed = :completed and t.title like %:keyword%")
   List<Todo> searchByStatusAndTitle(@Param("completed") boolean completed,
       @Param("keyword") String keyword);
 
-  @Query("select t from Todo t where t.title like %:keyword%")
+  @Query("select t from Todo t where t.deletedAt is null and t.title like %:keyword%")
   List<Todo> searchByTitle(@Param("keyword") String keyword);
 
-  List<Todo> findAllByUser_IdOrderByCreatedAtDesc(Long userId);
+  List<Todo> findAllByUser_IdAndDeletedAtIsNullOrderByCreatedAtDesc(Long userId);
+
+  Optional<Todo> findByIdAndDeletedAtIsNull(Long id);
+
+  List<Todo> findAllByDeletedAtIsNotNullOrderByDeletedAtDesc();
 }

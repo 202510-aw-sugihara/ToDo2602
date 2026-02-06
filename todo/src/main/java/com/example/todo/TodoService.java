@@ -34,7 +34,7 @@ public class TodoService {
 
   @Transactional(readOnly = true)
   public List<Todo> findAll(long userId) {
-    return todoRepository.findAllByUser_IdOrderByCreatedAtDesc(userId);
+    return todoRepository.findAllByUser_IdAndDeletedAtIsNullOrderByCreatedAtDesc(userId);
   }
 
   @Transactional(readOnly = true)
@@ -76,7 +76,8 @@ public class TodoService {
       return List.of();
     }
     List<Todo> todos = todoRepository.findAllById(ids);
-    todos.removeIf(todo -> todo.getUser() == null || !userIdEquals(todo, userId));
+    todos.removeIf(todo -> todo.getDeletedAt() != null
+        || todo.getUser() == null || !userIdEquals(todo, userId));
     todos.sort((a, b) -> {
       if (a.getCreatedAt() == null && b.getCreatedAt() == null) {
         return 0;
@@ -94,7 +95,17 @@ public class TodoService {
 
   @Transactional(readOnly = true)
   public Optional<Todo> findById(long id) {
+    return todoRepository.findByIdAndDeletedAtIsNull(id);
+  }
+
+  @Transactional(readOnly = true)
+  public Optional<Todo> findByIdIncludeDeleted(long id) {
     return todoRepository.findById(id);
+  }
+
+  @Transactional(readOnly = true)
+  public List<Todo> findDeleted() {
+    return todoRepository.findAllByDeletedAtIsNotNullOrderByDeletedAtDesc();
   }
 
   public TodoForm toForm(Todo todo) {
@@ -124,7 +135,7 @@ public class TodoService {
   @Transactional(rollbackFor = Exception.class, noRollbackFor = BusinessException.class)
   @Auditable(action = "TODO_UPDATE", targetType = "Todo")
   public Todo update(long id, TodoForm form) {
-    Todo todo = todoRepository.findById(id)
+    Todo todo = todoRepository.findByIdAndDeletedAtIsNull(id)
         .orElseThrow(() -> new IllegalArgumentException("Todo not found: " + id));
     todo.setAuthor(form.getAuthor());
     todo.setTitle(form.getTitle());
@@ -142,12 +153,35 @@ public class TodoService {
   @Transactional(rollbackFor = Exception.class, noRollbackFor = BusinessException.class)
   @Auditable(action = "TODO_DELETE", targetType = "Todo")
   public void deleteById(long id) {
+    Todo todo = todoRepository.findByIdAndDeletedAtIsNull(id)
+        .orElseThrow(() -> new IllegalArgumentException("Todo not found: " + id));
+    todo.setDeletedAt(java.time.LocalDateTime.now());
+    todoRepository.save(todo);
+    auditLogService.record("TODO_DELETE", "todoId=" + id);
+  }
+
+  @Transactional(rollbackFor = Exception.class, noRollbackFor = BusinessException.class)
+  @Auditable(action = "TODO_RESTORE", targetType = "Todo")
+  public void restoreById(long id) {
+    Todo todo = todoRepository.findById(id)
+        .orElseThrow(() -> new IllegalArgumentException("Todo not found: " + id));
+    if (todo.getDeletedAt() == null) {
+      return;
+    }
+    todo.setDeletedAt(null);
+    todoRepository.save(todo);
+    auditLogService.record("TODO_RESTORE", "todoId=" + id);
+  }
+
+  @Transactional(rollbackFor = Exception.class, noRollbackFor = BusinessException.class)
+  @Auditable(action = "TODO_DELETE", targetType = "Todo")
+  public void deleteByIdHard(long id) {
     if (!todoRepository.existsById(id)) {
       throw new IllegalArgumentException("Todo not found: " + id);
     }
     todoAttachmentService.deleteByTodoId(id);
     todoRepository.deleteById(id);
-    auditLogService.record("TODO_DELETE", "todoId=" + id);
+    auditLogService.record("TODO_DELETE_HARD", "todoId=" + id);
   }
 
   @Transactional(rollbackFor = Exception.class, noRollbackFor = BusinessException.class)
@@ -162,7 +196,7 @@ public class TodoService {
 
   @Transactional(rollbackFor = Exception.class, noRollbackFor = BusinessException.class)
   public boolean toggleCompleted(long id) {
-    Todo todo = todoRepository.findById(id)
+    Todo todo = todoRepository.findByIdAndDeletedAtIsNull(id)
         .orElseThrow(() -> new IllegalArgumentException("Todo not found: " + id));
     boolean newValue = !Boolean.TRUE.equals(todo.getCompleted());
     todo.setCompleted(newValue);

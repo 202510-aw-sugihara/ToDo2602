@@ -11,6 +11,7 @@
     <result column="due_date" property="dueDate"/>
     <result column="priority" property="priority"/>
     <result column="completed" property="completed"/>
+    <result column="deleted_at" property="deletedAt"/>
     <result column="created_at" property="createdAt"/>
     <result column="updated_at" property="updatedAt"/>
     <result column="version" property="version"/>
@@ -33,6 +34,7 @@
       t.due_date,
       t.priority,
       t.completed,
+      t.deleted_at,
       t.created_at,
       t.updated_at,
       t.version,
@@ -43,6 +45,7 @@
     FROM todos t
     LEFT JOIN categories c ON c.id = t.category_id
     <where>
+      AND t.deleted_at IS NULL
       <if test="userId != null">
         AND t.user_id = #{userId}
       </if>
@@ -71,6 +74,7 @@
     SELECT COUNT(*)
     FROM todos
     <where>
+      AND deleted_at IS NULL
       <if test="userId != null">
         AND user_id = #{userId}
       </if>
@@ -84,8 +88,10 @@
   </select>
 
   <delete id="deleteByIds" parameterType="map">
-    DELETE FROM todos
-    WHERE id IN
+    UPDATE todos
+    SET deleted_at = CURRENT_TIMESTAMP
+    WHERE deleted_at IS NULL
+    AND id IN
     <foreach collection="ids" item="id" open="(" separator="," close=")">
       #{id}
     </foreach>

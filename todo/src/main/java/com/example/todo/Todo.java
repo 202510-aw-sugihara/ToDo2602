@@ -58,6 +58,8 @@ public class Todo {
   @Column(nullable = false)
   private Boolean completed = false;
 
+  private LocalDateTime deletedAt;
+
   @Version
   private Long version;
 

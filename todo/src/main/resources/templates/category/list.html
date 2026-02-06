@@ -16,6 +16,7 @@
       <div class="container py-3 d-flex align-items-center justify-content-between">
         <div class="d-flex align-items-center gap-2">
           <h1 class="h4 mb-0" th:text="#{title.category_list}">Categories</h1>
+          <a class="btn btn-outline-secondary btn-sm" th:href="@{/todos}">ToDo一覧</a>
           <a class="btn btn-primary btn-sm" th:href="@{/categories/new}" th:text="#{btn.category_create}">
             New
           </a>
