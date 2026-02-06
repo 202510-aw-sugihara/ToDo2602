@@ -33,7 +33,7 @@
         </div>
           <form th:action="@{/logout}" method="post" class="ms-1">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-            <button class="btn btn-outline-secondary btn-sm" type="submit">ログアウト</button>
+            <button class="btn btn-outline-secondary btn-sm" type="submit" th:text="#{nav.logout}">Logout</button>
           </form>
         </div>
       </div>
@@ -441,6 +441,8 @@
   crossorigin="anonymous"></script>
   </body>
 </html>
+
+
 
 
 

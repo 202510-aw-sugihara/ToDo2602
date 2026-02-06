@@ -1,13 +1,18 @@
 package com.example.todo;
 
 import jakarta.validation.Valid;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import org.springframework.context.MessageSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.server.ResponseStatusException;
@@ -17,9 +22,26 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class CategoryController {
 
   private final CategoryRepository categoryRepository;
+  private final MessageSource messageSource;
 
-  public CategoryController(CategoryRepository categoryRepository) {
+  public CategoryController(CategoryRepository categoryRepository, MessageSource messageSource) {
     this.categoryRepository = categoryRepository;
+    this.messageSource = messageSource;
+  }
+
+  @ModelAttribute("categoryLabels")
+  public Map<Long, String> categoryLabels() {
+    Map<Long, String> labels = new LinkedHashMap<>();
+    Locale locale = LocaleContextHolder.getLocale();
+    for (Category category : categoryRepository.findAll()) {
+      if (category == null || category.getId() == null) {
+        continue;
+      }
+      String fallback = category.getName();
+      String label = messageSource.getMessage("category." + category.getId(), null, fallback, locale);
+      labels.put(category.getId(), label);
+    }
+    return labels;
   }
 
   @GetMapping("/categories")

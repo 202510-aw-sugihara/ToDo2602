@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 public class GlobalModelAttributes {
 
   private final MessageSource messageSource;
-  private final List<String> supportedLangs = List.of("ja", "en");
+  private final List<String> supportedLangs = List.of("ja", "en", "zh");
 
   public GlobalModelAttributes(MessageSource messageSource) {
     this.messageSource = messageSource;

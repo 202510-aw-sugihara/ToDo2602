@@ -58,7 +58,7 @@
                   <td>
                     <span class="badge" th:style="'background:' + ${c.color}"> </span>
                   </td>
-                  <td th:text="${c.name}">Category</td>
+                  <td th:text="${categoryLabels != null ? categoryLabels[c.id] : c.name}">Category</td>
                   <td>
                     <a class="btn btn-sm btn-outline-secondary" th:href="@{/categories/{id}/edit(id=${c.id})}" th:text="#{btn.edit}">
                       Edit

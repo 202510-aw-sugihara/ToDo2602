@@ -20,7 +20,7 @@
                   type="button"
                   data-bs-toggle="dropdown"
                   aria-expanded="false"
-                  th:text="${#locale.language == 'ja' ? '日本語' : 'English'}">
+                  th:text="${#locale.language == 'ja' ? '日本語' : (#locale.language == 'zh' ? '中文' : 'English')}">
             Language
           </button>
           <ul class="dropdown-menu">
@@ -29,6 +29,13 @@
                  th:classappend="${#locale.language == 'ja'} ? 'active' : ''"
                  th:href="@{?lang=ja}">
                 日本語
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item"
+                 th:classappend="${#locale.language == 'zh'} ? 'active' : ''"
+                 th:href="@{?lang=zh}">
+                中文
               </a>
             </li>
             <li>
