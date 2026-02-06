@@ -97,10 +97,12 @@ public class AdminUserController {
 
   @PostMapping("/create")
   public String create(@RequestParam("username") String username,
+      @RequestParam("email") String email,
       @RequestParam("password") String password,
       @RequestParam("role") String role,
       RedirectAttributes redirectAttributes) {
-    if (username == null || username.isBlank() || password == null || password.isBlank()) {
+    if (username == null || username.isBlank() || password == null || password.isBlank()
+        || email == null || email.isBlank()) {
       redirectAttributes.addFlashAttribute("errorMessage", "ユーザー名とパスワードは必須です。");
       return "redirect:/admin/users";
     }
@@ -115,6 +117,7 @@ public class AdminUserController {
 
     AppUser user = AppUser.builder()
         .username(username.trim())
+        .email(email.trim())
         .password(passwordEncoder.encode(password))
         .roles(role)
         .enabled(true)

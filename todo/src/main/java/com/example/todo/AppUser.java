@@ -32,6 +32,9 @@ public class AppUser {
   @Column(nullable = false, length = 200)
   private String roles;
 
+  @Column(nullable = false, length = 200)
+  private String email;
+
   @Column(nullable = false)
   private Boolean enabled = true;
 }

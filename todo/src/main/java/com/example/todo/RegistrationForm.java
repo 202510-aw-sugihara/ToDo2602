@@ -2,6 +2,7 @@ package com.example.todo;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Email;
 import lombok.Data;
 
 @Data
@@ -10,6 +11,11 @@ public class RegistrationForm {
   @NotBlank
   @Size(max = 50)
   private String username;
+
+  @NotBlank
+  @Email
+  @Size(max = 200)
+  private String email;
 
   @NotBlank
   @Size(min = 6, max = 100)

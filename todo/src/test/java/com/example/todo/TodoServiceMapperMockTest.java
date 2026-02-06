@@ -34,6 +34,9 @@ class TodoServiceMapperMockTest {
   @Mock
   private AuditLogService auditLogService;
 
+  @Mock
+  private MailService mailService;
+
   @InjectMocks
   private TodoService todoService;
 

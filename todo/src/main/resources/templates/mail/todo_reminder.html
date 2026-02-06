@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ToDo Reminder</title>
+  </head>
+  <body>
+    <p th:text="'Hello ' + ${user.username} + ','">Hello user,</p>
+    <p>Here are your upcoming ToDos (due within 3 days):</p>
+    <ul>
+      <li th:each="todo : ${todos}">
+        <span th:text="${todo.title}">Title</span>
+        -
+        <span th:text="${todo.dueDate == null ? '-' : todo.dueDate.format(dateFormatter)}">Due</span>
+      </li>
+    </ul>
+    <p>Thanks.</p>
+  </body>
+</html>

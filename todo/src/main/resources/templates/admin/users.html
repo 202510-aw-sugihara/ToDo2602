@@ -48,6 +48,7 @@
                 <tr>
                   <th style="width: 80px">ID</th>
                   <th th:text="#{label.username}">Username</th>
+                  <th th:text="#{label.email}">Email</th>
                   <th style="width: 160px" th:text="#{label.role}">Role</th>
                   <th style="width: 140px" th:text="#{label.account_status}">Status</th>
                   <th style="width: 200px" th:text="#{label.actions}">Actions</th>
@@ -57,6 +58,7 @@
                 <tr th:each="u : ${users}">
                   <td th:text="${u.id}">1</td>
                   <td th:text="${u.username}">user</td>
+                  <td th:text="${u.email}">user@example.com</td>
                   <td th:text="${u.roles}">ROLE_USER</td>
                   <td>
                     <span th:if="${u.enabled}" class="badge text-bg-success" th:text="#{label.enabled}">Enabled</span>
@@ -77,7 +79,7 @@
                   </td>
                 </tr>
                 <tr th:if="${users == null or #lists.isEmpty(users)}">
-                  <td colspan="5" class="text-center text-muted py-4" th:text="#{msg.no_users}">No users</td>
+                  <td colspan="6" class="text-center text-muted py-4" th:text="#{msg.no_users}">No users</td>
                 </tr>
               </tbody>
             </table>
@@ -93,22 +95,26 @@
         <div class="card-body">
           <form th:action="@{/admin/users/create}" method="post" class="row g-2 align-items-end">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-            <div class="col-12 col-md-4">
+            <div class="col-12 col-md-3">
               <label class="form-label" for="new-username" th:text="#{label.username}">Username</label>
               <input type="text" id="new-username" name="username" class="form-control" required />
             </div>
             <div class="col-12 col-md-4">
+              <label class="form-label" for="new-email" th:text="#{label.email}">Email</label>
+              <input type="email" id="new-email" name="email" class="form-control" required />
+            </div>
+            <div class="col-12 col-md-3">
               <label class="form-label" for="new-password" th:text="#{label.password}">Password</label>
               <input type="password" id="new-password" name="password" class="form-control" required />
             </div>
-            <div class="col-12 col-md-2">
+            <div class="col-12 col-md-1">
               <label class="form-label" for="new-role" th:text="#{label.role}">Role</label>
               <select id="new-role" name="role" class="form-select" required>
                 <option value="ROLE_USER">USER</option>
                 <option value="ROLE_ADMIN">ADMIN</option>
               </select>
             </div>
-            <div class="col-12 col-md-2">
+            <div class="col-12 col-md-1">
               <button type="submit" class="btn btn-primary w-100" th:text="#{btn.create}">Create</button>
             </div>
           </form>

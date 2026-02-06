@@ -42,6 +42,10 @@
               <input type="text" class="form-control" th:value="${editUser.username}" readonly />
             </div>
             <div class="col-12">
+              <label class="form-label" th:text="#{label.email}">Email</label>
+              <input type="email" class="form-control" th:value="${editUser.email}" readonly />
+            </div>
+            <div class="col-12">
               <label class="form-label" th:text="#{label.role}">Role</label>
               <select name="role" class="form-select">
                 <option value="ROLE_USER" th:selected="${editUser.roles.contains('ROLE_USER')}">USER</option>

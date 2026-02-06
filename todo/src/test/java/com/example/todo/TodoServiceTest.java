@@ -30,11 +30,15 @@ class TodoServiceTest {
   @MockBean
   private TodoMapper todoMapper;
 
+  @MockBean
+  private MailService mailService;
+
   @Test
   @DisplayName("create: 保存されたTodoが取得できる")
   void create_persistsTodo() {
     AppUser user = appUserRepository.save(AppUser.builder()
         .username("tester")
+        .email("tester@example.com")
         .password("{noop}pass")
         .roles("ROLE_USER")
         .enabled(true)
@@ -63,6 +67,7 @@ class TodoServiceTest {
   void findById_returnsTodo() {
     AppUser user = appUserRepository.save(AppUser.builder()
         .username("finder")
+        .email("finder@example.com")
         .password("{noop}pass")
         .roles("ROLE_USER")
         .enabled(true)
@@ -89,6 +94,7 @@ class TodoServiceTest {
   void deleteById_removesTodo() {
     AppUser user = appUserRepository.save(AppUser.builder()
         .username("deleter")
+        .email("deleter@example.com")
         .password("{noop}pass")
         .roles("ROLE_USER")
         .enabled(true)

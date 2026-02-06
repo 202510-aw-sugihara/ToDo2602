@@ -16,15 +16,17 @@ public class TodoService {
   private final CategoryRepository categoryRepository;
   private final AppUserRepository appUserRepository;
   private final AuditLogService auditLogService;
+  private final MailService mailService;
 
   public TodoService(TodoRepository todoRepository, TodoMapper todoMapper,
       CategoryRepository categoryRepository, AppUserRepository appUserRepository,
-      AuditLogService auditLogService) {
+      AuditLogService auditLogService, MailService mailService) {
     this.todoRepository = todoRepository;
     this.todoMapper = todoMapper;
     this.categoryRepository = categoryRepository;
     this.appUserRepository = appUserRepository;
     this.auditLogService = auditLogService;
+    this.mailService = mailService;
   }
 
   @Transactional(readOnly = true)
@@ -111,6 +113,7 @@ public class TodoService {
     Todo todo = toEntity(userId, form);
     Todo saved = todoRepository.save(todo);
     auditLogService.record("TODO_CREATE", "todoId=" + saved.getId() + ", userId=" + userId);
+    mailService.sendTodoCreated(saved.getUser(), saved);
     return saved;
   }
 

@@ -18,6 +18,8 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
 
   List<Todo> findAllByOrderByCreatedAtDesc();
 
+  List<Todo> findAllByDueDateBetweenAndCompletedFalse(LocalDate start, LocalDate end);
+
   @Query("select t from Todo t where t.completed = :completed and t.title like %:keyword%")
   List<Todo> searchByStatusAndTitle(@Param("completed") boolean completed,
       @Param("keyword") String keyword);
