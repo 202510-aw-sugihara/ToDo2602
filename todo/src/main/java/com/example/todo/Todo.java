@@ -66,8 +66,9 @@ public class Todo {
       inverseJoinColumns = @JoinColumn(name = "group_id"))
   private Set<Group> groups = new HashSet<>();
 
-  @Column(nullable = false)
-  private Boolean completed = false;
+  @Enumerated(EnumType.STRING)
+  @Column(length = 20)
+  private TodoStatus status;
 
   private LocalDateTime deletedAt;
 
@@ -93,6 +94,6 @@ public class Todo {
   }
 
   public boolean isCompleted() {
-    return Boolean.TRUE.equals(completed);
+    return status == TodoStatus.COMPLETED;
   }
 }

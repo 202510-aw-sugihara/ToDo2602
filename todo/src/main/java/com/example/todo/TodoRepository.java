@@ -9,8 +9,6 @@ import org.springframework.data.repository.query.Param;
 
 public interface TodoRepository extends JpaRepository<Todo, Long> {
 
-  List<Todo> findByCompletedAndDeletedAtIsNull(boolean completed);
-
   List<Todo> findByTitleContainingIgnoreCaseAndDeletedAtIsNull(String keyword);
 
   List<Todo> findByDueDateLessThanEqualAndDeletedAtIsNull(LocalDate date);
@@ -19,10 +17,10 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
 
   List<Todo> findAllByDeletedAtIsNullOrderByCreatedAtDesc();
 
-  List<Todo> findAllByDueDateBetweenAndCompletedFalseAndDeletedAtIsNull(LocalDate start, LocalDate end);
+  List<Todo> findAllByDueDateBetweenAndStatusNotAndDeletedAtIsNull(LocalDate start, LocalDate end, TodoStatus status);
 
-  @Query("select t from Todo t where t.deletedAt is null and t.completed = :completed and t.title like %:keyword%")
-  List<Todo> searchByStatusAndTitle(@Param("completed") boolean completed,
+  @Query("select t from Todo t where t.deletedAt is null and t.status = :status and t.title like %:keyword%")
+  List<Todo> searchByStatusAndTitle(@Param("status") TodoStatus status,
       @Param("keyword") String keyword);
 
   @Query("select t from Todo t where t.deletedAt is null and t.title like %:keyword%")

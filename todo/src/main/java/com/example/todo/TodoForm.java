@@ -40,7 +40,8 @@ public class TodoForm {
 
   private java.util.List<Long> groupIds;
 
-  private Boolean completed;
+  @NotNull(message = "{status.required}")
+  private TodoStatus status;
 
   private Long version;
 

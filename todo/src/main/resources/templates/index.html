@@ -16,6 +16,7 @@
       <div class="container py-3 d-flex align-items-center justify-content-between">
         <h1 class="h4 mb-0" th:text="#{app.title}">ToDo</h1>
         <div class="d-flex align-items-center gap-2">
+          <a class="btn btn-outline-secondary btn-sm" th:href="@{/profile}" th:text="#{nav.profile}">Profile</a>
         <div class="dropdown">
           <button class="btn btn-outline-secondary btn-sm dropdown-toggle"
                   type="button"
@@ -59,13 +60,26 @@
               </option>
             </select>
           </div>
+          <div class="col-auto">
+            <select class="form-select" name="groupId">
+              <option value="" th:text="#{label.group}">Group</option>
+              <option th:each="g : ${groups}"
+                      th:if="${g.type.name() == 'PROJECT'}"
+                      th:value="${g.id}"
+                      th:selected="${groupId == g.id}"
+                      th:text="${g.name}">
+                Group
+              </option>
+            </select>
+          </div>
           <input type="hidden" name="sort" th:value="${sort}" />
           <input type="hidden" name="direction" th:value="${direction}" />
+          <input type="hidden" name="status" th:value="${status}" />
           <div class="col-auto">
             <button class="btn btn-outline-primary" type="submit" th:text="#{btn.search}">Search</button>
           </div>
           <div class="col-auto"
-               th:if="${(keyword != null and !#strings.isEmpty(keyword)) or (categoryId != null)}">
+               th:if="${(keyword != null and !#strings.isEmpty(keyword)) or (categoryId != null) or (groupId != null)}">
             <a class="btn btn-outline-secondary" th:href="@{/todos}" th:text="#{btn.clear}">Clear</a>
           </div>
         </form>
@@ -83,6 +97,14 @@
         No todos
       </div>
 
+      <div class="filter-bar" id="status-filter">
+        <button class="filter-btn" data-status="" type="button" th:text="#{filter.all}">すべて</button>
+        <button class="filter-btn" data-status="IN_PROGRESS" type="button" th:text="#{status.in_progress}">進行中</button>
+        <button class="filter-btn" data-status="COMPLETED" type="button" th:text="#{status.completed}">完了</button>
+        <button class="filter-btn" data-status="ON_HOLD" type="button" th:text="#{status.on_hold}">保留中</button>
+        <button class="filter-btn" data-status="PLANNED" type="button" th:text="#{status.planned}">計画中</button>
+      </div>
+
       <div class="card shadow-sm">
         <div class="card-body">
           <div class="d-flex align-items-center justify-content-between mb-3">
@@ -92,7 +114,7 @@
               <a class="btn btn-outline-secondary"
                  id="csv-download"
                  th:text="#{btn.csv_download}"
-                 th:href="@{/todos/export(keyword=${keyword}, categoryId=${categoryId}, sort=${sort}, direction=${direction})}">
+                 th:href="@{/todos/export(keyword=${keyword}, categoryId=${categoryId}, groupId=${groupId}, status=${status}, sort=${sort}, direction=${direction})}">
                 CSV Download
               </a>
             </div>
@@ -117,7 +139,7 @@
                   <th style="width: 40px"><input type="checkbox" id="select-all" /></th>
                   <th class="text-nowrap" style="width: 140px">
                     <a class="text-decoration-none"
-                       th:href="@{/todos(sort='createdAt', direction=${sort == 'createdAt' and direction == 'asc' ? 'desc' : 'asc'}, keyword=${keyword}, categoryId=${categoryId})}"
+                       th:href="@{/todos(sort='createdAt', direction=${sort == 'createdAt' and direction == 'asc' ? 'desc' : 'asc'}, keyword=${keyword}, categoryId=${categoryId}, groupId=${groupId}, status=${status})}"
                        th:text="#{label.created_at}">
                       Created
                     </a>
@@ -152,18 +174,16 @@
                     <span th:text="${todo.category != null ? categoryLabels[todo.category.id] : '-'}">-</span>
                   </td>
                   <td>
-                    <form class="d-inline toggle-form"
-                          th:action="@{/todos/{id}/toggle(id=${todo.id})}"
-                          method="post"
-                          th:attr="data-completed=${todo.completed}">
-                      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-                      <button type="submit"
-                              class="btn btn-sm"
-                              th:classappend="${todo.completed} ? 'btn-success' : 'btn-outline-secondary'"
-                              th:text="${todo.completed} ? #{label.completed} : #{label.not_completed}">
-                        Status
-                      </button>
-                    </form>
+                    <span class="badge"
+                          th:classappend="${
+                            todo.status != null && todo.status.name() == 'COMPLETED' ? 'text-bg-success' :
+                            (todo.status != null && todo.status.name() == 'IN_PROGRESS' ? 'text-bg-primary' :
+                            (todo.status != null && todo.status.name() == 'ON_HOLD' ? 'text-bg-warning' :
+                            (todo.status != null && todo.status.name() == 'PLANNED' ? 'text-bg-secondary' : 'text-bg-light')))
+                          }"
+                          th:text="${todo.status != null ? #messages.msg('status.' + todo.status.name().toLowerCase()) : '-'}">
+                      Status
+                    </span>
                   </td>
                   <td>
                     <a class="btn btn-sm btn-outline-secondary" th:href="@{/todos/{id}/edit(id=${todo.id})}" th:text="#{btn.edit}">Edit</a>
@@ -200,6 +220,8 @@
         <span th:text="#{msg.footer}">© 2026 ToDo App</span>
         <span class="mx-2">|</span>
         <a th:href="@{/categories}" class="text-decoration-none" th:text="#{nav.categories}">Categories</a>
+        <span class="mx-2">|</span>
+        <a th:href="@{/profile}" class="text-decoration-none" th:text="#{nav.profile}">Profile</a>
         <span class="mx-2" sec:authorize="hasRole('ADMIN')">|</span>
         <a th:href="@{/admin/users}" class="text-decoration-none" sec:authorize="hasRole('ADMIN')" th:text="#{nav.admin}">Admin</a>
       </div>
@@ -285,57 +307,6 @@
     </script>
     <script th:inline="javascript">
       (() => {
-        const forms = Array.from(document.querySelectorAll(".toggle-form"));
-        if (forms.length === 0) return;
-
-        const confirmUncomplete = /*[[#{msg.confirm_uncomplete}]]*/ "Change to not completed?";
-        const labelCompleted = /*[[#{label.completed}]]*/ "Completed";
-        const labelNotCompleted = /*[[#{label.not_completed}]]*/ "Not completed";
-        const statusUpdateFailed = /*[[#{msg.status_update_failed}]]*/ "Failed to update status.";
-
-        forms.forEach((form) => {
-          form.addEventListener("submit", async (event) => {
-            event.preventDefault();
-            const isCompleted = form.getAttribute("data-completed") === "true";
-            if (isCompleted && !confirm(confirmUncomplete)) {
-              return;
-            }
-            try {
-              const csrfInput = form.querySelector("input[type='hidden']");
-              const csrfHeader = csrfInput ? csrfInput.name : null;
-              const csrfToken = csrfInput ? csrfInput.value : null;
-              const headers = { "X-Requested-With": "XMLHttpRequest" };
-              if (csrfHeader && csrfToken) {
-                headers[csrfHeader] = csrfToken;
-              }
-              const response = await fetch(form.action, {
-                method: "POST",
-                headers,
-              });
-              if (!response.ok) throw new Error("toggle failed");
-              const data = await response.json();
-              form.setAttribute("data-completed", String(data.completed));
-              const button = form.querySelector("button");
-              if (button) {
-                if (data.completed) {
-                  button.classList.remove("btn-outline-secondary");
-                  button.classList.add("btn-success");
-                  button.textContent = labelCompleted;
-                } else {
-                  button.classList.remove("btn-success");
-                  button.classList.add("btn-outline-secondary");
-                  button.textContent = labelNotCompleted;
-                }
-              }
-            } catch (e) {
-              alert(statusUpdateFailed);
-            }
-          });
-        });
-      })();
-    </script>
-    <script th:inline="javascript">
-      (() => {
         const csvLink = document.getElementById("csv-download");
         if (!csvLink) return;
 
@@ -368,6 +339,31 @@
             selected.forEach((id) => url.searchParams.append("ids", id));
             csvLink.href = url.pathname + url.search;
           }
+        });
+      })();
+    </script>
+    <script>
+      (() => {
+        const bar = document.getElementById("status-filter");
+        if (!bar) return;
+        const buttons = Array.from(bar.querySelectorAll(".filter-btn"));
+        const url = new URL(window.location.href);
+        const current = url.searchParams.get("status") || "";
+        buttons.forEach((btn) => {
+          if ((btn.getAttribute("data-status") || "") === current) {
+            btn.classList.add("active");
+          }
+          btn.addEventListener("click", () => {
+            buttons.forEach((b) => b.classList.remove("active"));
+            btn.classList.add("active");
+            const next = btn.getAttribute("data-status") || "";
+            if (next) {
+              url.searchParams.set("status", next);
+            } else {
+              url.searchParams.delete("status");
+            }
+            window.location.href = url.pathname + "?" + url.searchParams.toString();
+          });
         });
       })();
     </script>
@@ -433,6 +429,30 @@
         color: #212529;
         border-radius: 12px;
         box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+      }
+      .filter-bar {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+      }
+      .filter-btn {
+        padding: 8px 16px;
+        border: 1px solid #ddd;
+        border-radius: 20px;
+        background: #fff;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .filter-btn:hover {
+        border-color: #17a2b8;
+        color: #17a2b8;
+      }
+      .filter-btn.active {
+        background: #17a2b8;
+        border-color: #17a2b8;
+        color: #fff;
       }
     </style>
   <script

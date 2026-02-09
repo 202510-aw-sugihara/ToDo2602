@@ -10,7 +10,7 @@
     <result column="description" property="description"/>
     <result column="due_date" property="dueDate"/>
     <result column="priority" property="priority"/>
-    <result column="completed" property="completed"/>
+    <result column="status" property="status"/>
     <result column="deleted_at" property="deletedAt"/>
     <result column="created_at" property="createdAt"/>
     <result column="updated_at" property="updatedAt"/>
@@ -33,7 +33,7 @@
       t.description,
       t.due_date,
       t.priority,
-      t.completed,
+      t.status,
       t.deleted_at,
       t.created_at,
       t.updated_at,
@@ -56,6 +56,9 @@
       <if test="categoryId != null">
         AND t.category_id = #{categoryId}
       </if>
+      <if test="status != null">
+        AND t.status = #{status}
+      </if>
       <if test="groupIds != null and groupIds.size > 0">
         AND tg.group_id IN
         <foreach collection="groupIds" item="gid" open="(" separator="," close=")">
@@ -67,7 +70,7 @@
       <when test="sort == 'createdAt'">ORDER BY t.created_at</when>
       <when test="sort == 'title'">ORDER BY t.title</when>
       <when test="sort == 'dueDate'">ORDER BY t.due_date</when>
-      <when test="sort == 'completed'">ORDER BY t.completed</when>
+      <when test="sort == 'status'">ORDER BY t.status</when>
       <otherwise>ORDER BY t.created_at</otherwise>
     </choose>
     <choose>
@@ -91,6 +94,9 @@
       </if>
       <if test="categoryId != null">
         AND t.category_id = #{categoryId}
+      </if>
+      <if test="status != null">
+        AND t.status = #{status}
       </if>
       <if test="groupIds != null and groupIds.size > 0">
         AND tg.group_id IN

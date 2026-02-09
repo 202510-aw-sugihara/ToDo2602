@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>プロフィール</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Shippori+Mincho:wght@600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    />
+    <style>
+      :root {
+        --ink: #0c1222;
+        --subtle: #5a6274;
+        --surface: #ffffff;
+        --line: #e6e9f2;
+        --accent: #1e7bff;
+        --cover-a: #2b5bff;
+        --cover-b: #00c2ff;
+      }
+      body {
+        font-family: "Space Grotesk", "Shippori Mincho", sans-serif;
+        background: #f4f6fb;
+        color: var(--ink);
+      }
+      .profile-cover {
+        background: linear-gradient(120deg, var(--cover-a), var(--cover-b));
+        border-radius: 24px;
+        padding: 32px;
+        position: relative;
+        overflow: hidden;
+        color: #fff;
+      }
+      .profile-cover::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at 80% 20%, rgba(255,255,255,0.25), transparent 60%);
+      }
+      .profile-cover > * {
+        position: relative;
+        z-index: 1;
+      }
+      .avatar {
+        width: 96px;
+        height: 96px;
+        border-radius: 24px;
+        border: 3px solid rgba(255,255,255,0.65);
+        background: #dfe7ff;
+        display: grid;
+        place-items: center;
+        color: #2b5bff;
+        font-weight: 700;
+        font-size: 32px;
+        box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+      }
+      .card-section {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 20px;
+        box-shadow: 0 10px 30px rgba(12,18,34,0.04);
+      }
+      .stat-tile {
+        border-radius: 14px;
+        padding: 14px 16px;
+        background: #f7f9ff;
+        border: 1px solid #e7ecff;
+      }
+      .stat-value {
+        font-size: 20px;
+        font-weight: 700;
+      }
+      .timeline-item {
+        display: grid;
+        grid-template-columns: 64px 1fr;
+        gap: 12px;
+        padding: 12px 0;
+        border-bottom: 1px dashed #e2e7f3;
+      }
+      .timeline-item:last-child {
+        border-bottom: none;
+      }
+      .time-pill {
+        background: #eef2ff;
+        color: #2b5bff;
+        font-weight: 600;
+        border-radius: 12px;
+        text-align: center;
+        padding: 6px 0;
+      }
+      .activity-badge {
+        background: #0c1222;
+        color: #fff;
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .settings-list li {
+        padding: 10px 0;
+        border-bottom: 1px solid #eef1f7;
+      }
+      .settings-list li:last-child {
+        border-bottom: none;
+      }
+      .todo-row {
+        cursor: pointer;
+      }
+      .todo-row:hover {
+        background: #f5f8ff;
+      }
+      .shippori {
+        font-family: "Shippori Mincho", serif;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="container my-4">
+      <div class="d-flex justify-content-end mb-3">
+        <a class="btn btn-outline-secondary" href="/todos">ToDo一覧へ戻る</a>
+      </div>
+      <section class="profile-cover mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+          <div class="d-flex align-items-center gap-3">
+            <div class="avatar">TT</div>
+            <div>
+              <h1 class="h3 mb-1 shippori" th:text="${userName}">田中 太郎</h1>
+              <p class="mb-0" th:text="${userTitle}">プロジェクトマネージャー</p>
+            </div>
+          </div>
+          <span class="activity-badge">
+            ステータス
+            <strong th:text="${userStatus}">稼働中</strong>
+          </span>
+        </div>
+      </section>
+
+      <div class="row g-4">
+        <div class="col-12 col-lg-8">
+          <section class="card-section mb-4">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+              <h2 class="h5 mb-0">統計</h2>
+              <span class="text-muted small">直近30日</span>
+            </div>
+            <div class="row g-3">
+              <div class="col-12 col-md-4" th:each="stat : ${stats}">
+                <div class="stat-tile">
+                  <div class="text-muted small" th:text="${stat.label}">フォロワー</div>
+                  <div class="stat-value" th:text="${stat.value}">1,248</div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="card-section mb-4">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+              <div class="d-flex align-items-center gap-3">
+                <h2 class="h5 mb-0">タスク一覧</h2>
+                <span class="text-muted small" th:text="${openTodos != null ? openTodos.size() : 0}">0</span>
+              </div>
+              <div class="d-flex gap-2" id="profile-status-filter">
+                <button class="btn btn-sm btn-outline-secondary active" type="button" data-status="ALL">すべて</button>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-status="IN_PROGRESS">進行中</button>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-status="PLANNED">計画中</button>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-status="ON_HOLD">保留中</button>
+              </div>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr class="text-muted">
+                    <th>Title</th>
+                    <th>Due</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr th:each="todo : ${openTodos}"
+                      th:attr="data-status=${todo.status != null ? todo.status.name() : 'UNKNOWN'},data-link=@{/todos/{id}(id=${todo.id})}"
+                      class="todo-row">
+                    <td>
+                      <a class="text-decoration-none" th:href="@{/todos/{id}(id=${todo.id})}"
+                         th:text="${todo.title}">Todo title</a>
+                    </td>
+                    <td th:text="${todo.dueDate}">2026-02-09</td>
+                    <td>
+                      <span th:text="${todo.status != null ? #messages.msg('status.' + todo.status.name().toLowerCase()) : '-'}">Status</span>
+                    </td>
+                  </tr>
+                  <tr th:if="${openTodos == null or #lists.isEmpty(openTodos)}">
+                    <td colspan="3" class="text-muted">No open todos.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="card-section mb-4">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+              <h2 class="h5 mb-0">アクティビティ</h2>
+              <ul class="nav nav-pills" id="activity-tab" role="tablist">
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link active" id="tab-recent" data-bs-toggle="pill"
+                          data-bs-target="#pane-recent" type="button" role="tab">
+                    最近
+                  </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="tab-week" data-bs-toggle="pill"
+                          data-bs-target="#pane-week" type="button" role="tab">
+                    週間
+                  </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="tab-month" data-bs-toggle="pill"
+                          data-bs-target="#pane-month" type="button" role="tab">
+                    月間
+                  </button>
+                </li>
+              </ul>
+            </div>
+            <div class="tab-content">
+              <div class="tab-pane fade show active" id="pane-recent" role="tabpanel">
+                <div class="d-flex flex-column gap-2">
+                  <div class="d-flex align-items-center gap-2" th:each="act : ${activities}">
+                    <span class="badge text-bg-primary">更新</span>
+                    <span th:text="${act}">活動内容</span>
+                  </div>
+                </div>
+              </div>
+              <div class="tab-pane fade" id="pane-week" role="tabpanel">
+                <p class="text-muted mb-0">週間まとめは準備中です。</p>
+              </div>
+              <div class="tab-pane fade" id="pane-month" role="tabpanel">
+                <p class="text-muted mb-0">月間まとめは準備中です。</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="card-section">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+              <h2 class="h5 mb-0">タイムライン</h2>
+              <button class="btn btn-outline-primary btn-sm">新規投稿</button>
+            </div>
+            <div>
+              <div class="timeline-item" th:each="item : ${timeline}">
+                <div class="time-pill" th:text="${item.time}">09:10</div>
+                <div>
+                  <div class="fw-semibold" th:text="${item.title}">タイトル</div>
+                  <div class="text-muted small" th:text="${item.detail}">詳細</div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div class="col-12 col-lg-4">
+          <section class="card-section mb-4">
+            <h2 class="h5 mb-3">ユーザー情報</h2>
+            <div class="d-flex flex-column gap-2">
+              <div>
+                <div class="text-muted small">氏名</div>
+                <div class="fw-semibold" th:text="${userName}">田中 太郎</div>
+              </div>
+              <div>
+                <div class="text-muted small">メールアドレス</div>
+                <div class="fw-semibold" th:text="${userEmail}">taro@example.com</div>
+              </div>
+              <div>
+                <div class="text-muted small">役職</div>
+                <div class="fw-semibold" th:text="${userTitle}">プロジェクトマネージャー</div>
+              </div>
+              <div>
+                <div class="text-muted small">ロール</div>
+                <div class="fw-semibold" th:text="${userRoles}">ROLE_USER</div>
+              </div>
+              <div>
+                <div class="text-muted small">ステータス</div>
+                <div class="fw-semibold" th:text="${userStatus}">稼働中</div>
+              </div>
+              <div>
+                <div class="text-muted small">所属グループ</div>
+                <div class="d-flex flex-wrap gap-2">
+                  <span class="badge text-bg-light border"
+                        th:each="g : ${userGroups}"
+                        th:text="${g}">Group</span>
+                  <span class="text-muted small" th:if="${userGroups == null or #lists.isEmpty(userGroups)}">-</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="card-section">
+            <h2 class="h5 mb-3">設定</h2>
+            <ul class="list-unstyled settings-list mb-0">
+              <li class="d-flex justify-content-between align-items-center">
+                <span>通知設定</span>
+                <button class="btn btn-sm btn-outline-secondary">変更</button>
+              </li>
+              <li class="d-flex justify-content-between align-items-center">
+                <span>公開範囲</span>
+                <button class="btn btn-sm btn-outline-secondary">変更</button>
+              </li>
+              <li class="d-flex justify-content-between align-items-center">
+                <span>アカウント連携</span>
+                <button class="btn btn-sm btn-outline-secondary">設定</button>
+              </li>
+            </ul>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      (() => {
+        const filter = document.getElementById("profile-status-filter");
+        if (!filter) return;
+        const buttons = Array.from(filter.querySelectorAll("button[data-status]"));
+        const rows = Array.from(document.querySelectorAll(".todo-row"));
+
+        const setActive = (btn) => {
+          buttons.forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+        };
+
+        const applyFilter = (status) => {
+          rows.forEach((row) => {
+            const rowStatus = row.getAttribute("data-status") || "";
+            const visible = status === "ALL" || rowStatus === status;
+            row.style.display = visible ? "" : "none";
+          });
+        };
+
+        buttons.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const status = btn.getAttribute("data-status") || "ALL";
+            setActive(btn);
+            applyFilter(status);
+          });
+        });
+
+        rows.forEach((row) => {
+          row.addEventListener("click", (e) => {
+            if (e.target && e.target.closest("a")) return;
+            const link = row.getAttribute("data-link");
+            if (link) window.location.href = link;
+          });
+        });
+
+        const initial = buttons.find((b) => b.classList.contains("active")) || buttons[0];
+        if (initial) applyFilter(initial.getAttribute("data-status") || "ALL");
+      })();
+    </script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous"></script>
+  </body>
+</html>

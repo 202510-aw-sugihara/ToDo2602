@@ -140,12 +140,13 @@ public class TodoController {
       @RequestParam(required = false) String direction,
       @RequestParam(required = false) Long categoryId,
       @RequestParam(required = false) Long groupId,
+      @RequestParam(required = false) String status,
       @PageableDefault(size = 10) Pageable pageable,
       @AuthenticationPrincipal UserDetails userDetails,
       Model model) {
 
     long userId = requireUserId(userDetails);
-    Page<Todo> page = todoService.findPage(userId, keyword, sort, direction, categoryId, groupId, pageable);
+    Page<Todo> page = todoService.findPage(userId, keyword, sort, direction, categoryId, groupId, status, pageable);
     model.addAttribute("todos", page.getContent());
     model.addAttribute("page", page);
     model.addAttribute("keyword", keyword == null ? "" : keyword);
@@ -153,6 +154,7 @@ public class TodoController {
     model.addAttribute("direction", direction == null ? "desc" : direction);
     model.addAttribute("categoryId", categoryId);
     model.addAttribute("groupId", groupId);
+    model.addAttribute("status", status);
     model.addAttribute("resultCount", page.getTotalElements());
 
     long total = page.getTotalElements();
@@ -169,12 +171,13 @@ public class TodoController {
       @RequestParam(required = false) String direction,
       @RequestParam(required = false) Long categoryId,
       @RequestParam(required = false) Long groupId,
+      @RequestParam(required = false) String status,
       @RequestParam(required = false) List<Long> ids,
       @AuthenticationPrincipal UserDetails userDetails) {
     long userId = requireUserId(userDetails);
     List<Todo> todos = (ids != null && !ids.isEmpty())
         ? todoService.findForExportByIds(userId, ids)
-        : todoService.findForExport(userId, keyword, sort, direction, categoryId, groupId);
+        : todoService.findForExport(userId, keyword, sort, direction, categoryId, groupId, status);
     if (todos.isEmpty()) {
       return ResponseEntity.noContent().build();
     }
@@ -186,7 +189,11 @@ public class TodoController {
       csv.append(csvCell(todo.getId() == null ? "" : String.valueOf(todo.getId()))).append(",");
       csv.append(csvCell(todo.getTitle())).append(",");
       csv.append(csvCell(todo.getAuthor())).append(",");
-      csv.append(csvCell(todo.isCompleted() ? "完了" : "未完了")).append(",");
+      String statusLabel = todo.getStatus() != null
+          ? messageSource.getMessage("status." + todo.getStatus().name().toLowerCase(), null,
+              todo.getStatus().name(), LocaleContextHolder.getLocale())
+          : "-";
+      csv.append(csvCell(statusLabel)).append(",");
       String createdAt = todo.getCreatedAt() == null ? "" : todo.getCreatedAt().format(dateFormatter);
       csv.append(csvCell(createdAt)).append("\r\n");
     }
@@ -216,7 +223,11 @@ public class TodoController {
   }
 
   @GetMapping("/new")
-  public String newTodo(@ModelAttribute("todoForm") TodoForm form) {
+  public String newTodo(@ModelAttribute("todoForm") TodoForm form,
+      @AuthenticationPrincipal UserDetails userDetails) {
+    if (userDetails != null && (form.getAuthor() == null || form.getAuthor().isBlank())) {
+      form.setAuthor(userDetails.getUsername());
+    }
     if (form.getDueDate() == null) {
       form.setDueDate(java.time.LocalDate.now().plusWeeks(1));
     }
@@ -519,6 +530,9 @@ public class TodoController {
       HttpServletRequest request,
       RedirectAttributes redirectAttributes,
       @AuthenticationPrincipal UserDetails userDetails) {
+    redirectAttributes.addFlashAttribute("errorMessage", msg("msg.status_update_failed"));
+    return "redirect:/todos";
+/*
 
     boolean ajax = "XMLHttpRequest".equals(request.getHeader("X-Requested-With"));
 
@@ -551,6 +565,7 @@ public class TodoController {
       redirectAttributes.addFlashAttribute("errorMessage", msg("msg.not_found"));
       return "redirect:/todos";
     }
+*/
   }
 
   private long requireUserId(UserDetails userDetails) {

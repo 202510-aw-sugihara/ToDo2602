@@ -22,7 +22,8 @@ public class TodoReminderScheduler {
   public void sendDueSoonReminders() {
     LocalDate start = LocalDate.now();
     LocalDate end = start.plusDays(3);
-    List<Todo> todos = todoRepository.findAllByDueDateBetweenAndCompletedFalse(start, end);
+    List<Todo> todos = todoRepository.findAllByDueDateBetweenAndStatusNotAndDeletedAtIsNull(
+        start, end, TodoStatus.COMPLETED);
     Map<Long, List<Todo>> byUser = todos.stream()
         .filter(todo -> todo.getUser() != null && todo.getUser().getId() != null)
         .collect(Collectors.groupingBy(todo -> todo.getUser().getId()));

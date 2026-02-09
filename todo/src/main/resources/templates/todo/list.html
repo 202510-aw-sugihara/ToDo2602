@@ -15,7 +15,9 @@
     <header class="border-bottom bg-white">
       <div class="container py-3 d-flex align-items-center justify-content-between">
         <h1 class="h4 mb-0" th:text="#{app.title}">ToDo</h1>
-        <div class="dropdown">
+        <div class="d-flex align-items-center gap-2">
+          <a class="btn btn-outline-secondary btn-sm" th:href="@{/profile}" th:text="#{nav.profile}">Profile</a>
+          <div class="dropdown">
           <button class="btn btn-outline-secondary btn-sm dropdown-toggle"
                   type="button"
                   data-bs-toggle="dropdown"
@@ -29,6 +31,7 @@
                  th:text="${opt.label}">JA</a>
             </li>
           </ul>
+        </div>
         </div>
       </div>
       <div class="container pb-3">
@@ -203,6 +206,8 @@
         <span th:text="#{msg.footer}">© 2026 ToDo App</span>
         <span class="mx-2">|</span>
         <a th:href="@{/categories}" class="text-decoration-none" th:text="#{nav.categories}">Categories</a>
+        <span class="mx-2">|</span>
+        <a th:href="@{/profile}" class="text-decoration-none" th:text="#{nav.profile}">Profile</a>
         <span class="mx-2" sec:authorize="hasRole('ADMIN')">|</span>
         <a th:href="@{/admin/users}" class="text-decoration-none" sec:authorize="hasRole('ADMIN')" th:text="#{nav.admin}">Admin</a>
       </div>

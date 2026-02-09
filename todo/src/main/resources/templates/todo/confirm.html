@@ -54,6 +54,9 @@
             <dt class="col-sm-3" th:text="#{label.priority}">Priority</dt>
             <dd class="col-sm-9"
                 th:text="${todoForm.priority != null ? #messages.msg('priority.' + todoForm.priority.name().toLowerCase()) : '-'}">-</dd>
+            <dt class="col-sm-3" th:text="#{label.status}">Status</dt>
+            <dd class="col-sm-9"
+                th:text="${todoForm.status != null ? #messages.msg('status.' + todoForm.status.name().toLowerCase()) : '-'}">-</dd>
               <dt class="col-sm-3" th:text="#{label.category}">Category</dt>
               <dd class="col-sm-9">
                 <span th:if="${todoForm.categoryId == null}">-</span>
@@ -98,6 +101,7 @@
               <input type="hidden" th:field="*{detail}" />
               <input type="hidden" th:field="*{dueDate}" />
               <input type="hidden" th:field="*{priority}" />
+              <input type="hidden" th:field="*{status}" />
               <input type="hidden" th:field="*{categoryId}" />
               <input type="hidden" th:each="gid : ${todoForm.groupIds}" th:name="groupIds" th:value="${gid}" />
               <input type="hidden" th:each="v : ${todoForm.attachmentOriginalFilenames}" th:name="attachmentOriginalFilenames" th:value="${v}" />
@@ -112,6 +116,7 @@
               <input type="hidden" th:field="*{detail}" />
               <input type="hidden" th:field="*{dueDate}" />
               <input type="hidden" th:field="*{priority}" />
+              <input type="hidden" th:field="*{status}" />
               <input type="hidden" th:field="*{categoryId}" />
               <input type="hidden" th:each="gid : ${todoForm.groupIds}" th:name="groupIds" th:value="${gid}" />
               <input type="hidden" th:each="v : ${todoForm.attachmentOriginalFilenames}" th:name="attachmentOriginalFilenames" th:value="${v}" />

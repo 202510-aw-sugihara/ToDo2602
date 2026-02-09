@@ -56,7 +56,7 @@
 
             <div>
               <label class="form-label" th:text="#{label.author}">Author</label>
-              <input class="form-control" type="text" th:field="*{author}" />
+              <input class="form-control" type="text" th:field="*{author}" readonly />
               <div class="text-danger small" th:if="${#fields.hasErrors('author')}" th:errors="*{author}">
                 Error
               </div>
@@ -105,14 +105,50 @@
             </div>
             <div>
               <label class="form-label" th:text="#{label.group}">Group</label>
-              <select class="form-select" th:field="*{groupIds}" multiple>
-                <option th:each="g : ${groups}" th:value="${g.id}" th:text="${g.name}">Group</option>
-              </select>
+              <ul class="nav nav-tabs" id="group-tabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link active" id="tab-company-btn" data-bs-toggle="tab" data-bs-target="#tab-company"
+                          type="button" role="tab" aria-controls="tab-company" aria-selected="true"
+                          th:text="#{tab.company}">Company</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="tab-dept-btn" data-bs-toggle="tab" data-bs-target="#tab-dept"
+                          type="button" role="tab" aria-controls="tab-dept" aria-selected="false"
+                          th:text="#{tab.department}">Department</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="tab-client-btn" data-bs-toggle="tab" data-bs-target="#tab-client"
+                          type="button" role="tab" aria-controls="tab-client" aria-selected="false"
+                          th:text="#{tab.client}">Client</button>
+                </li>
+              </ul>
+              <div class="tab-content border border-top-0 rounded-bottom p-3 bg-white">
+                <div class="tab-pane fade show active" id="tab-company" role="tabpanel" aria-labelledby="tab-company-btn">
+                  <div class="group-tree" data-root-type="COMPANY"></div>
+                </div>
+                <div class="tab-pane fade" id="tab-dept" role="tabpanel" aria-labelledby="tab-dept-btn">
+                  <div class="group-tree" data-root-type="DEPARTMENT"></div>
+                </div>
+                <div class="tab-pane fade" id="tab-client" role="tabpanel" aria-labelledby="tab-client-btn">
+                  <div class="group-tree" data-root-type="CLIENT"></div>
+                </div>
+              </div>
+              <div id="group-selected-inputs"></div>
               <div class="form-text" th:text="#{msg.group_multi_hint}">Select multiple groups.</div>
             </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" th:field="*{completed}" />
-              <label class="form-check-label" th:text="#{label.completed}">Done</label>
+            <div>
+              <label class="form-label" th:text="#{label.status}">Status</label>
+              <select class="form-select" th:field="*{status}">
+                <option value="" th:text="#{label.select_status}" th:selected="*{status} == null">選択してください</option>
+                <option th:each="s : ${T(com.example.todo.TodoStatus).values()}"
+                        th:value="${s}"
+                        th:text="${#messages.msg('status.' + s.name().toLowerCase())}">
+                  Status
+                </option>
+              </select>
+              <div class="text-danger small" th:if="${#fields.hasErrors('status')}" th:errors="*{status}">
+                Error
+              </div>
             </div>
 
             <div>
@@ -199,6 +235,31 @@
         border-radius: 12px;
         box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
       }
+      .group-root,
+      .group-children {
+        list-style: none;
+        padding-left: 0;
+        margin: 0;
+      }
+      .group-children {
+        padding-left: 1.25rem;
+        margin-top: 0.4rem;
+      }
+      .group-node {
+        margin: 0.35rem 0;
+      }
+      .group-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-weight: 500;
+      }
+      .group-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
+      }
     </style>
     <script>
       (() => {
@@ -228,6 +289,102 @@
             }
           });
         }
+      })();
+    </script>
+    <script th:inline="javascript">
+      (() => {
+        const groups = /*[[${groupOptions}]]*/ [];
+        const selectedIds = new Set(/*[[${todoForm.groupIds}]]*/ []);
+        const inputsContainer = document.getElementById("group-selected-inputs");
+
+        const childrenMap = new Map();
+        groups.forEach((g) => {
+          if (!g || g.id == null) return;
+          const parentId = g.parentId || null;
+          if (!childrenMap.has(parentId)) {
+            childrenMap.set(parentId, []);
+          }
+          childrenMap.get(parentId).push(g);
+        });
+
+        const selectableTypes = new Set(["PROJECT", "CLIENT", "DEPARTMENT"]);
+
+        const renderNode = (node) => {
+          const li = document.createElement("li");
+          li.className = "group-node";
+          const label = document.createElement("label");
+          label.className = "group-label";
+          if (selectableTypes.has(node.type)) {
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.className = "form-check-input me-2";
+            checkbox.value = node.id;
+            checkbox.checked = selectedIds.has(node.id);
+            checkbox.addEventListener("change", () => {
+              if (checkbox.checked) {
+                selectedIds.add(node.id);
+              } else {
+                selectedIds.delete(node.id);
+              }
+              syncInputs();
+            });
+            label.appendChild(checkbox);
+          } else {
+            const dot = document.createElement("span");
+            dot.className = "group-dot";
+            dot.style.background = node.color || "#6c757d";
+            label.appendChild(dot);
+          }
+          const text = document.createElement("span");
+          text.textContent = node.name;
+          label.appendChild(text);
+          li.appendChild(label);
+
+          const kids = childrenMap.get(node.id) || [];
+          if (kids.length > 0) {
+            const ul = document.createElement("ul");
+            ul.className = "group-children";
+            kids.forEach((child) => ul.appendChild(renderNode(child)));
+            li.appendChild(ul);
+          }
+          return li;
+        };
+
+        const buildTree = (rootType, container) => {
+          container.innerHTML = "";
+          const ul = document.createElement("ul");
+          ul.className = "group-root";
+          if (rootType === "COMPANY") {
+            const companies = groups.filter((g) => g.type === "COMPANY");
+            companies.forEach((c) => {
+              ul.appendChild(renderNode(c));
+            });
+          } else if (rootType === "DEPARTMENT") {
+            const departments = groups.filter((g) => g.type === "DEPARTMENT");
+            departments.forEach((d) => ul.appendChild(renderNode(d)));
+          } else if (rootType === "CLIENT") {
+            const clients = groups.filter((g) => g.type === "CLIENT");
+            clients.forEach((c) => ul.appendChild(renderNode(c)));
+          }
+          container.appendChild(ul);
+        };
+
+        const syncInputs = () => {
+          if (!inputsContainer) return;
+          inputsContainer.innerHTML = "";
+          Array.from(selectedIds).forEach((id) => {
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.name = "groupIds";
+            input.value = String(id);
+            inputsContainer.appendChild(input);
+          });
+        };
+
+        document.querySelectorAll(".group-tree").forEach((el) => {
+          buildTree(el.getAttribute("data-root-type"), el);
+        });
+        syncInputs();
       })();
     </script>
     <script>

@@ -45,13 +45,14 @@ public class TodoService {
 
   @Transactional(readOnly = true)
   public Page<Todo> findPage(long userId, String keyword, String sort, String direction,
-      Long categoryId, Long groupId,
+      Long categoryId, Long groupId, String status,
       Pageable pageable) {
     String safeSort = (sort == null || sort.isBlank()) ? "createdAt" : sort;
     String safeDirection = (direction == null || direction.isBlank()) ? "desc" : direction;
     String safeKeyword = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
+    TodoStatus safeStatus = parseStatus(status);
     List<Long> groupIds = resolveGroupFilterIds(groupId);
-    long total = todoMapper.count(safeKeyword, userId, categoryId, groupIds);
+    long total = todoMapper.count(safeKeyword, userId, categoryId, groupIds, safeStatus);
     List<Todo> content = todoMapper.search(
         safeKeyword,
         userId,
@@ -59,6 +60,7 @@ public class TodoService {
         safeDirection,
         categoryId,
         groupIds,
+        safeStatus,
         pageable.getPageSize(),
         (int) pageable.getOffset());
     return new PageImpl<>(content, pageable, total);
@@ -66,17 +68,18 @@ public class TodoService {
 
   @Transactional(readOnly = true)
   public List<Todo> findForExport(long userId, String keyword, String sort, String direction,
-      Long categoryId, Long groupId) {
+      Long categoryId, Long groupId, String status) {
     String safeSort = (sort == null || sort.isBlank()) ? "createdAt" : sort;
     String safeDirection = (direction == null || direction.isBlank()) ? "desc" : direction;
     String safeKeyword = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
+    TodoStatus safeStatus = parseStatus(status);
     List<Long> groupIds = resolveGroupFilterIds(groupId);
-    long total = todoMapper.count(safeKeyword, userId, categoryId, groupIds);
+    long total = todoMapper.count(safeKeyword, userId, categoryId, groupIds, safeStatus);
     if (total <= 0) {
       return List.of();
     }
     int limit = total > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) total;
-    return todoMapper.search(safeKeyword, userId, safeSort, safeDirection, categoryId, groupIds, limit, 0);
+    return todoMapper.search(safeKeyword, userId, safeSort, safeDirection, categoryId, groupIds, safeStatus, limit, 0);
   }
 
   @Transactional(readOnly = true)
@@ -133,7 +136,7 @@ public class TodoService {
           .toList();
       form.setGroupIds(ids);
     }
-    form.setCompleted(todo.getCompleted());
+    form.setStatus(todo.getStatus());
     form.setVersion(todo.getVersion());
     return form;
   }
@@ -141,6 +144,8 @@ public class TodoService {
   @Transactional(rollbackFor = Exception.class, noRollbackFor = BusinessException.class)
   @Auditable(action = "TODO_CREATE", targetType = "Todo")
   public Todo create(long userId, TodoForm form) {
+    AppUser user = resolveUser(userId);
+    form.setAuthor(user.getUsername());
     Todo todo = toEntity(userId, form);
     Todo saved = todoRepository.save(todo);
     auditLogService.record("TODO_CREATE", "todoId=" + saved.getId() + ", userId=" + userId);
@@ -153,13 +158,12 @@ public class TodoService {
   public Todo update(long id, TodoForm form) {
     Todo todo = todoRepository.findByIdAndDeletedAtIsNull(id)
         .orElseThrow(() -> new IllegalArgumentException("Todo not found: " + id));
-    todo.setAuthor(form.getAuthor());
     todo.setTitle(form.getTitle());
     todo.setDescription(form.getDetail());
     todo.setDueDate(form.getDueDate());
     todo.setPriority(form.getPriority() != null ? form.getPriority() : Priority.MEDIUM);
     todo.setCategory(resolveCategory(form.getCategoryId()));
-    todo.setCompleted(Boolean.TRUE.equals(form.getCompleted()));
+    todo.setStatus(form.getStatus());
     todo.setGroups(resolveGroups(form.getGroupIds()));
     todo.setVersion(form.getVersion());
     Todo saved = todoRepository.save(todo);
@@ -211,17 +215,6 @@ public class TodoService {
     return deleted;
   }
 
-  @Transactional(rollbackFor = Exception.class, noRollbackFor = BusinessException.class)
-  public boolean toggleCompleted(long id) {
-    Todo todo = todoRepository.findByIdAndDeletedAtIsNull(id)
-        .orElseThrow(() -> new IllegalArgumentException("Todo not found: " + id));
-    boolean newValue = !Boolean.TRUE.equals(todo.getCompleted());
-    todo.setCompleted(newValue);
-    todoRepository.save(todo);
-    auditLogService.record("TODO_TOGGLE", "todoId=" + id + ", completed=" + newValue);
-    return newValue;
-  }
-
   private Todo toEntity(long userId, TodoForm form) {
     return Todo.builder()
         .author(form.getAuthor())
@@ -232,7 +225,7 @@ public class TodoService {
         .category(resolveCategory(form.getCategoryId()))
         .user(resolveUser(userId))
         .groups(resolveGroups(form.getGroupIds()))
-        .completed(false)
+        .status(form.getStatus())
         .build();
   }
 
@@ -301,6 +294,17 @@ public class TodoService {
       return List.of(-1L);
     }
     return projectIds;
+  }
+
+  private TodoStatus parseStatus(String status) {
+    if (status == null || status.isBlank()) {
+      return null;
+    }
+    try {
+      return TodoStatus.valueOf(status);
+    } catch (IllegalArgumentException ex) {
+      return null;
+    }
   }
 
   private boolean userIdEquals(Todo todo, long userId) {

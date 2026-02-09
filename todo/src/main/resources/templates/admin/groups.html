@@ -51,6 +51,7 @@
                   <th style="width: 80px" th:text="#{label.color}">Color</th>
                   <th th:text="#{label.group_name}">Group</th>
                   <th style="width: 140px" th:text="#{label.group_type}">Type</th>
+                  <th style="width: 200px" th:text="#{label.group_parent}">Parent</th>
                 </tr>
               </thead>
               <tbody>
@@ -61,9 +62,10 @@
                   </td>
                   <td th:text="${g.name}">Group</td>
                   <td th:text="${#messages.msg('group.type.' + g.type.name().toLowerCase())}">Type</td>
+                  <td th:text="${g.parent != null ? g.parent.name : '-'}">-</td>
                 </tr>
                 <tr th:if="${groups == null or #lists.isEmpty(groups)}">
-                  <td colspan="4" class="text-center text-muted py-4" th:text="#{msg.no_groups}">
+                  <td colspan="5" class="text-center text-muted py-4" th:text="#{msg.no_groups}">
                     No groups
                   </td>
                 </tr>
@@ -98,6 +100,19 @@
               <div class="text-danger small" th:if="${#fields.hasErrors('type')}" th:errors="*{type}">Error</div>
             </div>
             <div class="col-12 col-md-3">
+              <label class="form-label" th:text="#{label.group_parent}">Parent</label>
+              <select class="form-select" th:field="*{parentId}" id="group-parent">
+                <option value="" th:text="#{label.none}">None</option>
+                <option th:each="p : ${parentCandidates}"
+                        th:value="${p.id}"
+                        th:text="${#messages.msg('group.type.' + p.type.name().toLowerCase()) + ' / ' + p.name}"
+                        th:attr="data-parent-type=${p.type.name()}">
+                  Parent
+                </option>
+              </select>
+              <div class="text-danger small" th:if="${#fields.hasErrors('parentId')}" th:errors="*{parentId}">Error</div>
+            </div>
+            <div class="col-12 col-md-2">
               <label class="form-label" th:text="#{label.color}">Color</label>
               <input type="color" class="form-control form-control-color" th:field="*{color}" />
               <div class="text-danger small" th:if="${#fields.hasErrors('color')}" th:errors="*{color}">Error</div>
@@ -109,6 +124,44 @@
         </div>
       </details>
     </main>
+    <script>
+      (() => {
+        const typeSelect = document.querySelector("select[name='type']");
+        const parentSelect = document.getElementById("group-parent");
+        if (!typeSelect || !parentSelect) return;
+
+        const updateParentOptions = () => {
+          const type = typeSelect.value;
+          const options = Array.from(parentSelect.querySelectorAll("option"));
+          options.forEach((opt) => {
+            if (!opt.value) {
+              opt.hidden = false;
+              opt.disabled = false;
+              return;
+            }
+            const parentType = opt.getAttribute("data-parent-type");
+            let allowed = false;
+            if (type === "COMPANY" || type === "CLIENT") {
+              allowed = false;
+            } else if (type === "DEPARTMENT") {
+              allowed = parentType === "COMPANY";
+            } else if (type === "PROJECT") {
+              allowed = parentType === "DEPARTMENT" || parentType === "CLIENT";
+            }
+            opt.hidden = !allowed;
+            opt.disabled = !allowed;
+          });
+          if (type === "COMPANY" || type === "CLIENT") {
+            parentSelect.value = "";
+          } else if (parentSelect.selectedOptions.length > 0 && parentSelect.selectedOptions[0].disabled) {
+            parentSelect.value = "";
+          }
+        };
+
+        typeSelect.addEventListener("change", updateParentOptions);
+        updateParentOptions();
+      })();
+    </script>
   <script
   src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
   integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"

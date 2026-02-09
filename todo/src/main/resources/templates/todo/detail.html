@@ -45,11 +45,10 @@
             <dt class="col-sm-3" th:text="#{label.priority}">Priority</dt>
             <dd class="col-sm-9"
                 th:text="${todo.priority != null ? #messages.msg('priority.' + todo.priority.name().toLowerCase()) : '-'}">-</dd>
-            <dt class="col-sm-3" th:text="#{label.status}">Status</dt>
-            <dd class="col-sm-9">
-              <span th:if="${todo.completed}" th:text="#{label.completed}">Completed</span>
-              <span th:unless="${todo.completed}" th:text="#{label.not_completed}">Not completed</span>
-            </dd>
+              <dt class="col-sm-3" th:text="#{label.status}">Status</dt>
+              <dd class="col-sm-9">
+                <span th:text="${todo.status != null ? #messages.msg('status.' + todo.status.name().toLowerCase()) : '-'}">-</span>
+              </dd>
             <dt class="col-sm-3" th:text="#{label.group}">Group</dt>
             <dd class="col-sm-9">
               <span th:if="${todo.groups == null or #lists.isEmpty(todo.groups)}">-</span>

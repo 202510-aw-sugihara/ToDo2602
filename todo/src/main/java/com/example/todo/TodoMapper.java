@@ -13,13 +13,15 @@ public interface TodoMapper {
       @Param("direction") String direction,
       @Param("categoryId") Long categoryId,
       @Param("groupIds") List<Long> groupIds,
+      @Param("status") TodoStatus status,
       @Param("limit") int limit,
       @Param("offset") int offset);
 
   long count(@Param("keyword") String keyword,
       @Param("userId") Long userId,
       @Param("categoryId") Long categoryId,
-      @Param("groupIds") List<Long> groupIds);
+      @Param("groupIds") List<Long> groupIds,
+      @Param("status") TodoStatus status);
 
   int deleteByIds(@Param("ids") List<Long> ids,
       @Param("userId") Long userId);
