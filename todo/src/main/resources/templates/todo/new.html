@@ -42,7 +42,7 @@
       <div class="card shadow-sm">
         <div class="card-body">
           <form th:action="@{/todos/confirm}" th:object="${todoForm}" method="post"
-                enctype="multipart/form-data" class="vstack gap-3">
+                enctype="multipart/form-data" class="vstack gap-3" data-disable-on-submit="true">
             <div>
               <label class="form-label" th:text="#{label.author}">Author</label>
               <input class="form-control" type="text" th:field="*{author}" readonly />
@@ -191,6 +191,18 @@
             }
           });
         }
+      })();
+    </script>
+    <script>
+      (() => {
+        const form = document.querySelector("form[data-disable-on-submit='true']");
+        if (!form) return;
+        form.addEventListener("submit", () => {
+          const buttons = form.querySelectorAll("button[type='submit']");
+          buttons.forEach((btn) => {
+            btn.disabled = true;
+          });
+        });
       })();
     </script>
     <script th:inline="javascript">

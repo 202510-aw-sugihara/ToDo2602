@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja" xmlns:th="http://www.thymeleaf.org">
   <head>
     <meta charset="UTF-8" />
@@ -107,18 +107,36 @@
         align-items: center;
         gap: 6px;
       }
-      .settings-list li {
-        padding: 10px 0;
-        border-bottom: 1px solid #eef1f7;
-      }
-      .settings-list li:last-child {
-        border-bottom: none;
-      }
       .todo-row {
         cursor: pointer;
       }
       .todo-row:hover {
         background: #f5f8ff;
+      }
+      .group-root,
+      .group-children {
+        list-style: none;
+        padding-left: 0;
+        margin: 0;
+      }
+      .group-children {
+        padding-left: 1.25rem;
+        margin-top: 0.4rem;
+      }
+      .group-node {
+        margin: 0.35rem 0;
+      }
+      .group-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-weight: 500;
+      }
+      .group-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        display: inline-block;
       }
       .shippori {
         font-family: "Shippori Mincho", serif;
@@ -128,20 +146,21 @@
   <body>
     <main class="container my-4">
       <div class="d-flex justify-content-end mb-3">
-        <a class="btn btn-outline-secondary" href="/todos">ToDo一覧へ戻る</a>
+        <a class="btn btn-outline-secondary" href="/todos">ToDo一覧へ</a>
       </div>
+
       <section class="profile-cover mb-4">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
           <div class="d-flex align-items-center gap-3">
             <div class="avatar">TT</div>
             <div>
-              <h1 class="h3 mb-1 shippori" th:text="${userName}">田中 太郎</h1>
-              <p class="mb-0" th:text="${userTitle}">プロジェクトマネージャー</p>
+              <h1 class="h3 mb-1 shippori" th:text="${userName}">User</h1>
+              <p class="mb-0" th:text="${userTitle}">Role</p>
             </div>
           </div>
           <span class="activity-badge">
             ステータス
-            <strong th:text="${userStatus}">稼働中</strong>
+            <strong th:text="${userStatus}">Active</strong>
           </span>
         </div>
       </section>
@@ -151,13 +170,13 @@
           <section class="card-section mb-4">
             <div class="d-flex align-items-center justify-content-between mb-3">
               <h2 class="h5 mb-0">統計</h2>
-              <span class="text-muted small">直近30日</span>
+              <span class="text-muted small">最新</span>
             </div>
             <div class="row g-3">
               <div class="col-12 col-md-4" th:each="stat : ${stats}">
                 <div class="stat-tile">
-                  <div class="text-muted small" th:text="${stat.label}">フォロワー</div>
-                  <div class="stat-value" th:text="${stat.value}">1,248</div>
+                  <div class="text-muted small" th:text="${stat.label}">Followers</div>
+                  <div class="stat-value" th:text="${stat.value}">0</div>
                 </div>
               </div>
             </div>
@@ -167,14 +186,31 @@
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
               <div class="d-flex align-items-center gap-3">
                 <h2 class="h5 mb-0">タスク一覧</h2>
-                <span class="text-muted small" th:text="${openTodos != null ? openTodos.size() : 0}">0</span>
+                <span class="text-muted small" id="profile-task-count"
+                      th:text="${ownedTodos != null ? ownedTodos.size() : 0}">0</span>
               </div>
-              <div class="d-flex gap-2" id="profile-status-filter">
-                <button class="btn btn-sm btn-outline-secondary active" type="button" data-status="ALL">すべて</button>
-                <button class="btn btn-sm btn-outline-secondary" type="button" data-status="IN_PROGRESS">進行中</button>
-                <button class="btn btn-sm btn-outline-secondary" type="button" data-status="PLANNED">計画中</button>
-                <button class="btn btn-sm btn-outline-secondary" type="button" data-status="ON_HOLD">保留中</button>
-              </div>
+            </div>
+            <ul class="nav nav-tabs mb-3" id="profile-task-tabs">
+              <li class="nav-item">
+                <button class="nav-link active" type="button" data-scope="OWN">
+                  自分で作成したもの
+                  <span class="text-muted small ms-1"
+                        th:text="${ownedTodos != null ? ownedTodos.size() : 0}">0</span>
+                </button>
+              </li>
+              <li class="nav-item">
+                <button class="nav-link" type="button" data-scope="SHARED">
+                  他ユーザーから追加されたもの
+                  <span class="text-muted small ms-1"
+                        th:text="${sharedTodos != null ? sharedTodos.size() : 0}">0</span>
+                </button>
+              </li>
+            </ul>
+            <div class="d-flex gap-2 mb-3" id="profile-status-filter">
+              <button class="btn btn-sm btn-outline-secondary active" type="button" data-status="ALL">すべて</button>
+              <button class="btn btn-sm btn-outline-secondary" type="button" data-status="IN_PROGRESS">進行中</button>
+              <button class="btn btn-sm btn-outline-secondary" type="button" data-status="PLANNED">計画中</button>
+              <button class="btn btn-sm btn-outline-secondary" type="button" data-status="ON_HOLD">保留中</button>
             </div>
             <div class="table-responsive">
               <table class="table table-sm align-middle mb-0">
@@ -186,8 +222,8 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr th:each="todo : ${openTodos}"
-                      th:attr="data-status=${todo.status != null ? todo.status.name() : 'UNKNOWN'},data-link=@{/todos/{id}(id=${todo.id})}"
+                  <tr th:each="todo : ${ownedTodos}"
+                      th:attr="data-status=${todo.status != null ? todo.status.name() : 'UNKNOWN'},data-scope='OWN',data-link=@{/todos/{id}(id=${todo.id})}"
                       class="todo-row">
                     <td>
                       <a class="text-decoration-none" th:href="@{/todos/{id}(id=${todo.id})}"
@@ -198,7 +234,19 @@
                       <span th:text="${todo.status != null ? #messages.msg('status.' + todo.status.name().toLowerCase()) : '-'}">Status</span>
                     </td>
                   </tr>
-                  <tr th:if="${openTodos == null or #lists.isEmpty(openTodos)}">
+                  <tr th:each="todo : ${sharedTodos}"
+                      th:attr="data-status=${todo.status != null ? todo.status.name() : 'UNKNOWN'},data-scope='SHARED',data-link=@{/todos/{id}(id=${todo.id})}"
+                      class="todo-row">
+                    <td>
+                      <a class="text-decoration-none" th:href="@{/todos/{id}(id=${todo.id})}"
+                         th:text="${todo.title}">Todo title</a>
+                    </td>
+                    <td th:text="${todo.dueDate}">2026-02-09</td>
+                    <td>
+                      <span th:text="${todo.status != null ? #messages.msg('status.' + todo.status.name().toLowerCase()) : '-'}">Status</span>
+                    </td>
+                  </tr>
+                  <tr th:if="${(ownedTodos == null or #lists.isEmpty(ownedTodos)) and (sharedTodos == null or #lists.isEmpty(sharedTodos))}">
                     <td colspan="3" class="text-muted">No open todos.</td>
                   </tr>
                 </tbody>
@@ -209,41 +257,11 @@
           <section class="card-section mb-4">
             <div class="d-flex align-items-center justify-content-between mb-3">
               <h2 class="h5 mb-0">アクティビティ</h2>
-              <ul class="nav nav-pills" id="activity-tab" role="tablist">
-                <li class="nav-item" role="presentation">
-                  <button class="nav-link active" id="tab-recent" data-bs-toggle="pill"
-                          data-bs-target="#pane-recent" type="button" role="tab">
-                    最近
-                  </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                  <button class="nav-link" id="tab-week" data-bs-toggle="pill"
-                          data-bs-target="#pane-week" type="button" role="tab">
-                    週間
-                  </button>
-                </li>
-                <li class="nav-item" role="presentation">
-                  <button class="nav-link" id="tab-month" data-bs-toggle="pill"
-                          data-bs-target="#pane-month" type="button" role="tab">
-                    月間
-                  </button>
-                </li>
-              </ul>
             </div>
-            <div class="tab-content">
-              <div class="tab-pane fade show active" id="pane-recent" role="tabpanel">
-                <div class="d-flex flex-column gap-2">
-                  <div class="d-flex align-items-center gap-2" th:each="act : ${activities}">
-                    <span class="badge text-bg-primary">更新</span>
-                    <span th:text="${act}">活動内容</span>
-                  </div>
-                </div>
-              </div>
-              <div class="tab-pane fade" id="pane-week" role="tabpanel">
-                <p class="text-muted mb-0">週間まとめは準備中です。</p>
-              </div>
-              <div class="tab-pane fade" id="pane-month" role="tabpanel">
-                <p class="text-muted mb-0">月間まとめは準備中です。</p>
+            <div class="d-flex flex-column gap-2">
+              <div class="d-flex align-items-center gap-2" th:each="act : ${activities}">
+                <span class="badge text-bg-primary">更新</span>
+                <span th:text="${act}">Activity</span>
               </div>
             </div>
           </section>
@@ -251,7 +269,6 @@
           <section class="card-section">
             <div class="d-flex align-items-center justify-content-between mb-3">
               <h2 class="h5 mb-0">タイムライン</h2>
-              <button class="btn btn-outline-primary btn-sm">新規投稿</button>
             </div>
             <div>
               <div class="timeline-item" th:each="item : ${timeline}">
@@ -270,16 +287,12 @@
             <h2 class="h5 mb-3">ユーザー情報</h2>
             <div class="d-flex flex-column gap-2">
               <div>
-                <div class="text-muted small">氏名</div>
-                <div class="fw-semibold" th:text="${userName}">田中 太郎</div>
+                <div class="text-muted small">表示名</div>
+                <div class="fw-semibold" th:text="${userName}">User</div>
               </div>
               <div>
-                <div class="text-muted small">メールアドレス</div>
-                <div class="fw-semibold" th:text="${userEmail}">taro@example.com</div>
-              </div>
-              <div>
-                <div class="text-muted small">役職</div>
-                <div class="fw-semibold" th:text="${userTitle}">プロジェクトマネージャー</div>
+                <div class="text-muted small">メール</div>
+                <div class="fw-semibold" th:text="${userEmail}">user@example.com</div>
               </div>
               <div>
                 <div class="text-muted small">ロール</div>
@@ -287,7 +300,7 @@
               </div>
               <div>
                 <div class="text-muted small">ステータス</div>
-                <div class="fw-semibold" th:text="${userStatus}">稼働中</div>
+                <div class="fw-semibold" th:text="${userStatus}">Active</div>
               </div>
               <div>
                 <div class="text-muted small">所属グループ</div>
@@ -302,21 +315,69 @@
           </section>
 
           <section class="card-section">
-            <h2 class="h5 mb-3">設定</h2>
-            <ul class="list-unstyled settings-list mb-0">
-              <li class="d-flex justify-content-between align-items-center">
-                <span>通知設定</span>
-                <button class="btn btn-sm btn-outline-secondary">変更</button>
-              </li>
-              <li class="d-flex justify-content-between align-items-center">
-                <span>公開範囲</span>
-                <button class="btn btn-sm btn-outline-secondary">変更</button>
-              </li>
-              <li class="d-flex justify-content-between align-items-center">
-                <span>アカウント連携</span>
-                <button class="btn btn-sm btn-outline-secondary">設定</button>
-              </li>
-            </ul>
+            <h2 class="h5 mb-3">プロフィール編集</h2>
+            <div class="alert alert-success py-2" th:if="${successMessage}" th:text="${successMessage}">Updated</div>
+            <form th:action="@{/profile}" th:object="${profileForm}" method="post" class="vstack gap-3">
+              <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+              <div>
+                <label class="form-label">表示名</label>
+                <input class="form-control" type="text" th:field="*{username}" />
+              </div>
+              <div>
+                <label class="form-label">メール</label>
+                <input class="form-control" type="email" th:field="*{email}" />
+              </div>
+              <div>
+                <label class="form-label">ロール</label>
+                <select class="form-select" th:field="*{roles}">
+                  <option value="ROLE_USER">ROLE_USER</option>
+                  <option value="ROLE_ADMIN">ROLE_ADMIN</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label">ステータス</label>
+                <select class="form-select" th:field="*{enabled}">
+                  <option th:value="true">有効</option>
+                  <option th:value="false">無効</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label">所属グループ</label>
+                <ul class="nav nav-tabs" id="profile-group-tabs" role="tablist">
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="profile-tab-company" data-bs-toggle="tab" data-bs-target="#profile-company"
+                            type="button" role="tab" aria-controls="profile-company" aria-selected="true"
+                            th:text="#{tab.company}">会社</button>
+                  </li>
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="profile-tab-dept" data-bs-toggle="tab" data-bs-target="#profile-dept"
+                            type="button" role="tab" aria-controls="profile-dept" aria-selected="false"
+                            th:text="#{tab.department}">部署</button>
+                  </li>
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="profile-tab-client" data-bs-toggle="tab" data-bs-target="#profile-client"
+                            type="button" role="tab" aria-controls="profile-client" aria-selected="false"
+                            th:text="#{tab.client}">クライアント</button>
+                  </li>
+                </ul>
+                <div class="tab-content border border-top-0 rounded-bottom p-3 bg-white">
+                  <div class="tab-pane fade show active" id="profile-company" role="tabpanel" aria-labelledby="profile-tab-company">
+                    <div class="profile-group-tree" data-root-type="COMPANY"></div>
+                  </div>
+                  <div class="tab-pane fade" id="profile-dept" role="tabpanel" aria-labelledby="profile-tab-dept">
+                    <div class="profile-group-tree" data-root-type="DEPARTMENT"></div>
+                  </div>
+                  <div class="tab-pane fade" id="profile-client" role="tabpanel" aria-labelledby="profile-tab-client">
+                    <div class="profile-group-tree" data-root-type="CLIENT"></div>
+                  </div>
+                </div>
+                <div id="profile-group-selected-inputs"></div>
+                <div class="form-text">会社・部署・プロジェクトを選択できます。</div>
+              </div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit" th:text="#{btn.save}">保存</button>
+              </div>
+            </form>
           </section>
         </div>
       </div>
@@ -324,28 +385,56 @@
 
     <script>
       (() => {
+        const countEl = document.getElementById("profile-task-count");
+        const tabContainer = document.getElementById("profile-task-tabs");
         const filter = document.getElementById("profile-status-filter");
         if (!filter) return;
         const buttons = Array.from(filter.querySelectorAll("button[data-status]"));
+        const tabButtons = tabContainer ? Array.from(tabContainer.querySelectorAll("button[data-scope]")) : [];
         const rows = Array.from(document.querySelectorAll(".todo-row"));
+        let activeScope = "OWN";
 
         const setActive = (btn) => {
           buttons.forEach((b) => b.classList.remove("active"));
           btn.classList.add("active");
         };
 
+        const setTabActive = (btn) => {
+          tabButtons.forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+        };
+
+        const updateCount = () => {
+          if (!countEl) return;
+          const visible = rows.filter((row) => row.style.display !== "none").length;
+          countEl.textContent = String(visible);
+        };
+
         const applyFilter = (status) => {
           rows.forEach((row) => {
             const rowStatus = row.getAttribute("data-status") || "";
-            const visible = status === "ALL" || rowStatus === status;
+            const rowScope = row.getAttribute("data-scope") || "OWN";
+            const visible = (rowScope === activeScope)
+              && (status === "ALL" || rowStatus === status);
             row.style.display = visible ? "" : "none";
           });
+          updateCount();
         };
 
         buttons.forEach((btn) => {
           btn.addEventListener("click", () => {
             const status = btn.getAttribute("data-status") || "ALL";
             setActive(btn);
+            applyFilter(status);
+          });
+        });
+
+        tabButtons.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            activeScope = btn.getAttribute("data-scope") || "OWN";
+            setTabActive(btn);
+            const status = (buttons.find((b) => b.classList.contains("active")) || buttons[0])
+              ?.getAttribute("data-status") || "ALL";
             applyFilter(status);
           });
         });
@@ -359,7 +448,103 @@
         });
 
         const initial = buttons.find((b) => b.classList.contains("active")) || buttons[0];
+        const initialTab = tabButtons.find((b) => b.classList.contains("active")) || tabButtons[0];
+        if (initialTab) activeScope = initialTab.getAttribute("data-scope") || "OWN";
         if (initial) applyFilter(initial.getAttribute("data-status") || "ALL");
+      })();
+    </script>
+    <script th:inline="javascript">
+      (() => {
+        const groups = /*[[${groupOptions}]]*/ [];
+        const selectedIds = new Set(/*[[${profileForm.groupIds}]]*/ []);
+        const inputsContainer = document.getElementById("profile-group-selected-inputs");
+
+        const childrenMap = new Map();
+        groups.forEach((g) => {
+          if (!g || g.id == null) return;
+          const parentId = g.parentId || null;
+          if (!childrenMap.has(parentId)) {
+            childrenMap.set(parentId, []);
+          }
+          childrenMap.get(parentId).push(g);
+        });
+
+        const selectableTypes = new Set(["COMPANY", "DEPARTMENT", "PROJECT", "CLIENT"]);
+
+        const renderNode = (node) => {
+          const li = document.createElement("li");
+          li.className = "group-node";
+          const label = document.createElement("label");
+          label.className = "group-label";
+          if (selectableTypes.has(node.type)) {
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.className = "form-check-input me-2";
+            checkbox.value = node.id;
+            checkbox.checked = selectedIds.has(node.id);
+            checkbox.addEventListener("change", () => {
+              if (checkbox.checked) {
+                selectedIds.add(node.id);
+              } else {
+                selectedIds.delete(node.id);
+              }
+              syncInputs();
+            });
+            label.appendChild(checkbox);
+          } else {
+            const dot = document.createElement("span");
+            dot.className = "group-dot";
+            dot.style.background = node.color || "#6c757d";
+            label.appendChild(dot);
+          }
+          const text = document.createElement("span");
+          text.textContent = node.name;
+          label.appendChild(text);
+          li.appendChild(label);
+
+          const kids = childrenMap.get(node.id) || [];
+          if (kids.length > 0) {
+            const ul = document.createElement("ul");
+            ul.className = "group-children";
+            kids.forEach((child) => ul.appendChild(renderNode(child)));
+            li.appendChild(ul);
+          }
+          return li;
+        };
+
+        const buildTree = (rootType, container) => {
+          container.innerHTML = "";
+          const ul = document.createElement("ul");
+          ul.className = "group-root";
+          if (rootType === "COMPANY") {
+            const companies = groups.filter((g) => g.type === "COMPANY");
+            companies.forEach((c) => { ul.appendChild(renderNode(c)); });
+          } else if (rootType === "DEPARTMENT") {
+            const departments = groups.filter((g) => g.type === "DEPARTMENT");
+            departments.forEach((d) => { ul.appendChild(renderNode(d)); });
+          } else if (rootType === "CLIENT") {
+            const clients = groups.filter((g) => g.type === "CLIENT");
+            clients.forEach((c) => { ul.appendChild(renderNode(c)); });
+          }
+          container.appendChild(ul);
+        };
+
+        const syncInputs = () => {
+          if (!inputsContainer) return;
+          inputsContainer.innerHTML = "";
+          Array.from(selectedIds).forEach((id) => {
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.name = "groupIds";
+            input.value = String(id);
+            inputsContainer.appendChild(input);
+          });
+        };
+
+        document.querySelectorAll(".profile-group-tree").forEach((el) => {
+          buildTree(el.getAttribute("data-root-type"), el);
+        });
+        syncInputs();
       })();
     </script>
     <script

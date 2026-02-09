@@ -28,6 +28,12 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
 
   List<Todo> findAllByUser_IdAndDeletedAtIsNullOrderByCreatedAtDesc(Long userId);
 
+  @Query("select distinct t from Todo t join t.groups g "
+      + "where t.deletedAt is null and g.id in :groupIds and t.user.id <> :userId "
+      + "order by t.createdAt desc")
+  List<Todo> findSharedByGroupIds(@Param("userId") Long userId,
+      @Param("groupIds") List<Long> groupIds);
+
   Optional<Todo> findByIdAndDeletedAtIsNull(Long id);
 
   List<Todo> findAllByDeletedAtIsNotNullOrderByDeletedAtDesc();

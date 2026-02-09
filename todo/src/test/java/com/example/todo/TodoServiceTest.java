@@ -79,7 +79,7 @@ class TodoServiceTest {
         .dueDate(LocalDate.now().plusDays(3))
         .priority(Priority.MEDIUM)
         .user(user)
-        .completed(false)
+        .status(TodoStatus.IN_PROGRESS)
         .build();
     Todo saved = todoRepository.save(todo);
 
@@ -106,12 +106,15 @@ class TodoServiceTest {
         .dueDate(LocalDate.now().plusDays(2))
         .priority(Priority.LOW)
         .user(user)
-        .completed(false)
+        .status(TodoStatus.IN_PROGRESS)
         .build();
     Todo saved = todoRepository.save(todo);
 
     todoService.deleteById(saved.getId());
 
-    assertThat(todoRepository.findById(saved.getId())).isEmpty();
+    Optional<Todo> deleted = todoRepository.findById(saved.getId());
+    assertThat(deleted).isPresent();
+    assertThat(deleted.get().getDeletedAt()).isNotNull();
+    assertThat(todoRepository.findByIdAndDeletedAtIsNull(saved.getId())).isEmpty();
   }
 }

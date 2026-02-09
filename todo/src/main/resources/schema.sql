@@ -26,3 +26,9 @@ CREATE TABLE IF NOT EXISTS todo_groups (
   group_id BIGINT NOT NULL,
   PRIMARY KEY (todo_id, group_id)
 );
+
+CREATE TABLE IF NOT EXISTS user_groups (
+  user_id BIGINT NOT NULL,
+  group_id BIGINT NOT NULL,
+  PRIMARY KEY (user_id, group_id)
+);

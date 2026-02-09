@@ -1,8 +1,13 @@
-package com.example.todo;
+﻿package com.example.todo;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import jakarta.validation.Valid;
+import org.springframework.validation.BindingResult;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,10 +27,13 @@ public class AdminUserController {
 
   private final AppUserRepository appUserRepository;
   private final PasswordEncoder passwordEncoder;
+  private final GroupRepository groupRepository;
 
-  public AdminUserController(AppUserRepository appUserRepository, PasswordEncoder passwordEncoder) {
+  public AdminUserController(AppUserRepository appUserRepository, PasswordEncoder passwordEncoder,
+      GroupRepository groupRepository) {
     this.appUserRepository = appUserRepository;
     this.passwordEncoder = passwordEncoder;
+    this.groupRepository = groupRepository;
   }
 
   @GetMapping
@@ -40,58 +48,102 @@ public class AdminUserController {
       RedirectAttributes redirectAttributes) {
     AppUser user = appUserRepository.findById(id).orElse(null);
     if (user == null) {
-      redirectAttributes.addFlashAttribute("errorMessage", "ユーザーが見つかりません。");
+      redirectAttributes.addFlashAttribute("errorMessage", "Operation failed.");
       return "redirect:/admin/users";
     }
+    ProfileForm form = new ProfileForm();
+    form.setUsername(user.getUsername());
+    form.setEmail(user.getEmail());
+    form.setRoles(user.getRoles());
+    form.setEnabled(user.getEnabled());
+    if (user.getDefaultGroups() != null && !user.getDefaultGroups().isEmpty()) {
+      form.setGroupIds(user.getDefaultGroups().stream()
+          .filter(g -> g != null && g.getId() != null)
+          .map(Group::getId)
+          .toList());
+    }
     model.addAttribute("editUser", user);
+    model.addAttribute("editForm", form);
+    model.addAttribute("groupOptions", buildGroupOptions());
     return "admin/user_edit";
   }
 
   @PostMapping("/{id}/update")
   public String update(@PathVariable("id") long id,
-      @RequestParam("role") String role,
-      @RequestParam(name = "enabled", required = false) String enabledValue,
+      @Valid ProfileForm form,
+      BindingResult bindingResult,
       Authentication authentication,
       RedirectAttributes redirectAttributes) {
     AppUser user = appUserRepository.findById(id).orElse(null);
     if (user == null) {
-      redirectAttributes.addFlashAttribute("errorMessage", "ユーザーが見つかりません。");
+      redirectAttributes.addFlashAttribute("errorMessage", "Operation failed.");
       return "redirect:/admin/users";
     }
+    if (bindingResult.hasErrors()) {
+      return "redirect:/admin/users/" + id + "/edit";
+    }
+
+    String role = form.getRoles();
     if (!"ROLE_USER".equals(role) && !"ROLE_ADMIN".equals(role)) {
-      redirectAttributes.addFlashAttribute("errorMessage", "不正な権限指定です。");
+      redirectAttributes.addFlashAttribute("errorMessage", "Operation failed.");
       return "redirect:/admin/users";
     }
-    boolean enabled = "on".equals(enabledValue) || "true".equalsIgnoreCase(enabledValue);
+    boolean enabled = form.getEnabled() != null && form.getEnabled();
 
     boolean isCurrentlyAdmin = user.getRoles() != null && user.getRoles().contains("ROLE_ADMIN");
     if (isCurrentlyAdmin && "ROLE_USER".equals(role)) {
       long adminCount = appUserRepository.countByRolesContaining("ROLE_ADMIN");
       if (adminCount <= 1) {
-        redirectAttributes.addFlashAttribute("errorMessage", "管理者は最低1人必要です。");
+      redirectAttributes.addFlashAttribute("errorMessage", "Operation failed.");
         return "redirect:/admin/users";
       }
     }
     if (isCurrentlyAdmin && !enabled) {
       long adminCount = appUserRepository.countByRolesContaining("ROLE_ADMIN");
       if (adminCount <= 1) {
-        redirectAttributes.addFlashAttribute("errorMessage", "管理者は最低1人必要です。");
+      redirectAttributes.addFlashAttribute("errorMessage", "Operation failed.");
         return "redirect:/admin/users";
       }
     }
 
     if (authentication != null && authentication.getName().equals(user.getUsername()) && !enabled) {
-      redirectAttributes.addFlashAttribute("errorMessage", "自分自身を無効化できません。");
+      redirectAttributes.addFlashAttribute("errorMessage", "Operation failed.");
       return "redirect:/admin/users";
     }
+
+    String nextUsername = form.getUsername() != null ? form.getUsername().trim() : "";
+    if (nextUsername.isBlank()) {
+      redirectAttributes.addFlashAttribute("errorMessage", "Operation failed.");
+      return "redirect:/admin/users/" + id + "/edit";
+    }
+    if (!nextUsername.equals(user.getUsername())
+        && appUserRepository.findByUsername(nextUsername).isPresent()) {
+      redirectAttributes.addFlashAttribute("errorMessage", "Operation failed.");
+      return "redirect:/admin/users/" + id + "/edit";
+    }
+
+    String nextEmail = form.getEmail() != null ? form.getEmail().trim() : "";
+    if (nextEmail.isBlank()) {
+      redirectAttributes.addFlashAttribute("errorMessage", "Operation failed.");
+      return "redirect:/admin/users/" + id + "/edit";
+    }
+
     Set<String> roles = parseRoles(user.getRoles());
     roles.remove("ROLE_ADMIN");
     roles.remove("ROLE_USER");
     roles.add(role);
     user.setRoles(String.join(",", roles));
     user.setEnabled(enabled);
+    user.setUsername(nextUsername);
+    user.setEmail(nextEmail);
+    if (form.getGroupIds() == null || form.getGroupIds().isEmpty()) {
+      user.setDefaultGroups(new java.util.HashSet<>());
+    } else {
+      List<Group> groups = groupRepository.findAllById(form.getGroupIds());
+      user.setDefaultGroups(new java.util.HashSet<>(groups));
+    }
     appUserRepository.save(user);
-    redirectAttributes.addFlashAttribute("successMessage", "ユーザー情報を更新しました。");
+      redirectAttributes.addFlashAttribute("successMessage", "Updated.");
     return "redirect:/admin/users";
   }
 
@@ -103,15 +155,15 @@ public class AdminUserController {
       RedirectAttributes redirectAttributes) {
     if (username == null || username.isBlank() || password == null || password.isBlank()
         || email == null || email.isBlank()) {
-      redirectAttributes.addFlashAttribute("errorMessage", "ユーザー名とパスワードは必須です。");
+      redirectAttributes.addFlashAttribute("errorMessage", "Operation failed.");
       return "redirect:/admin/users";
     }
     if (!"ROLE_USER".equals(role) && !"ROLE_ADMIN".equals(role)) {
-      redirectAttributes.addFlashAttribute("errorMessage", "不正な権限指定です。");
+      redirectAttributes.addFlashAttribute("errorMessage", "Operation failed.");
       return "redirect:/admin/users";
     }
     if (appUserRepository.findByUsername(username).isPresent()) {
-      redirectAttributes.addFlashAttribute("errorMessage", "このユーザー名は既に登録されています。");
+      redirectAttributes.addFlashAttribute("errorMessage", "Operation failed.");
       return "redirect:/admin/users";
     }
 
@@ -123,7 +175,7 @@ public class AdminUserController {
         .enabled(true)
         .build();
     appUserRepository.save(user);
-    redirectAttributes.addFlashAttribute("successMessage", "ユーザーを作成しました。");
+      redirectAttributes.addFlashAttribute("successMessage", "Updated.");
     return "redirect:/admin/users";
   }
 
@@ -133,18 +185,18 @@ public class AdminUserController {
       RedirectAttributes redirectAttributes) {
     AppUser user = appUserRepository.findById(id).orElse(null);
     if (user == null) {
-      redirectAttributes.addFlashAttribute("errorMessage", "ユーザーが見つかりません。");
+      redirectAttributes.addFlashAttribute("errorMessage", "Operation failed.");
       return "redirect:/admin/users";
     }
     if (!"ROLE_USER".equals(role) && !"ROLE_ADMIN".equals(role)) {
-      redirectAttributes.addFlashAttribute("errorMessage", "不正な権限指定です。");
+      redirectAttributes.addFlashAttribute("errorMessage", "Operation failed.");
       return "redirect:/admin/users";
     }
     boolean isCurrentlyAdmin = user.getRoles() != null && user.getRoles().contains("ROLE_ADMIN");
     if (isCurrentlyAdmin && "ROLE_USER".equals(role)) {
       long adminCount = appUserRepository.countByRolesContaining("ROLE_ADMIN");
       if (adminCount <= 1) {
-        redirectAttributes.addFlashAttribute("errorMessage", "管理者は最低1人必要です。");
+      redirectAttributes.addFlashAttribute("errorMessage", "Operation failed.");
         return "redirect:/admin/users";
       }
     }
@@ -154,7 +206,7 @@ public class AdminUserController {
     roles.add(role);
     user.setRoles(String.join(",", roles));
     appUserRepository.save(user);
-    redirectAttributes.addFlashAttribute("successMessage", "権限を更新しました。");
+      redirectAttributes.addFlashAttribute("successMessage", "Updated.");
     return "redirect:/admin/users";
   }
 
@@ -164,22 +216,22 @@ public class AdminUserController {
       RedirectAttributes redirectAttributes) {
     AppUser user = appUserRepository.findById(id).orElse(null);
     if (user == null) {
-      redirectAttributes.addFlashAttribute("errorMessage", "ユーザーが見つかりません。");
+      redirectAttributes.addFlashAttribute("errorMessage", "Operation failed.");
       return "redirect:/admin/users";
     }
     if (authentication != null && authentication.getName().equals(user.getUsername())) {
-      redirectAttributes.addFlashAttribute("errorMessage", "自分自身は削除できません。");
+      redirectAttributes.addFlashAttribute("errorMessage", "Operation failed.");
       return "redirect:/admin/users";
     }
     if (user.getRoles() != null && user.getRoles().contains("ROLE_ADMIN")) {
       long adminCount = appUserRepository.countByRolesContaining("ROLE_ADMIN");
       if (adminCount <= 1) {
-        redirectAttributes.addFlashAttribute("errorMessage", "管理者は最低1人必要です。");
+      redirectAttributes.addFlashAttribute("errorMessage", "Operation failed.");
         return "redirect:/admin/users";
       }
     }
     appUserRepository.delete(user);
-    redirectAttributes.addFlashAttribute("successMessage", "ユーザーを削除しました。");
+      redirectAttributes.addFlashAttribute("successMessage", "Updated.");
     return "redirect:/admin/users";
   }
 
@@ -192,4 +244,28 @@ public class AdminUserController {
         .filter(s -> !s.isBlank())
         .collect(Collectors.toSet());
   }
+
+  private List<Map<String, Object>> buildGroupOptions() {
+    List<Group> groups = groupRepository.findAllByOrderByTypeAscNameAsc();
+    List<Map<String, Object>> options = new ArrayList<>();
+    for (Group group : groups) {
+      if (group == null || group.getId() == null) {
+        continue;
+      }
+      Map<String, Object> row = new LinkedHashMap<>();
+      row.put("id", group.getId());
+      row.put("name", group.getName());
+      row.put("type", group.getType() == null ? null : group.getType().name());
+      row.put("parentId", group.getParentId());
+      row.put("color", group.getColor());
+      options.add(row);
+    }
+    return options;
+  }
 }
+
+
+
+
+
+

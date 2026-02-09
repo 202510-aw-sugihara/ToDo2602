@@ -47,7 +47,16 @@
     LEFT JOIN todo_groups tg ON tg.todo_id = t.id
     <where>
       AND t.deleted_at IS NULL
-      <if test="userId != null">
+      <if test="userId != null and userGroupIds != null and userGroupIds.size > 0">
+        AND (
+          t.user_id = #{userId}
+          OR tg.group_id IN
+          <foreach collection="userGroupIds" item="gid" open="(" separator="," close=")">
+            #{gid}
+          </foreach>
+        )
+      </if>
+      <if test="userId != null and (userGroupIds == null or userGroupIds.size == 0)">
         AND t.user_id = #{userId}
       </if>
       <if test="keyword != null and keyword != ''">
@@ -86,7 +95,16 @@
     LEFT JOIN todo_groups tg ON tg.todo_id = t.id
     <where>
       AND t.deleted_at IS NULL
-      <if test="userId != null">
+      <if test="userId != null and userGroupIds != null and userGroupIds.size > 0">
+        AND (
+          t.user_id = #{userId}
+          OR tg.group_id IN
+          <foreach collection="userGroupIds" item="gid" open="(" separator="," close=")">
+            #{gid}
+          </foreach>
+        )
+      </if>
+      <if test="userId != null and (userGroupIds == null or userGroupIds.size == 0)">
         AND t.user_id = #{userId}
       </if>
       <if test="keyword != null and keyword != ''">

@@ -1,11 +1,14 @@
-package com.example.todo;
+﻿package com.example.todo;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.Page;
@@ -23,6 +26,8 @@ public class TodoService {
   private final MailService mailService;
   private final TodoAttachmentService todoAttachmentService;
   private final GroupRepository groupRepository;
+  private final ConcurrentHashMap<Long, RecentSubmission> recentSubmissions = new ConcurrentHashMap<>();
+  private static final long DUPLICATE_WINDOW_MS = 5000;
 
   public TodoService(TodoRepository todoRepository, TodoMapper todoMapper,
       CategoryRepository categoryRepository, AppUserRepository appUserRepository,
@@ -52,10 +57,12 @@ public class TodoService {
     String safeKeyword = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
     TodoStatus safeStatus = parseStatus(status);
     List<Long> groupIds = resolveGroupFilterIds(groupId);
-    long total = todoMapper.count(safeKeyword, userId, categoryId, groupIds, safeStatus);
+    List<Long> userGroupIds = resolveUserGroupIds(userId);
+    long total = todoMapper.count(safeKeyword, userId, userGroupIds, categoryId, groupIds, safeStatus);
     List<Todo> content = todoMapper.search(
         safeKeyword,
         userId,
+        userGroupIds,
         safeSort,
         safeDirection,
         categoryId,
@@ -74,12 +81,13 @@ public class TodoService {
     String safeKeyword = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
     TodoStatus safeStatus = parseStatus(status);
     List<Long> groupIds = resolveGroupFilterIds(groupId);
-    long total = todoMapper.count(safeKeyword, userId, categoryId, groupIds, safeStatus);
+    List<Long> userGroupIds = resolveUserGroupIds(userId);
+    long total = todoMapper.count(safeKeyword, userId, userGroupIds, categoryId, groupIds, safeStatus);
     if (total <= 0) {
       return List.of();
     }
     int limit = total > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) total;
-    return todoMapper.search(safeKeyword, userId, safeSort, safeDirection, categoryId, groupIds, safeStatus, limit, 0);
+    return todoMapper.search(safeKeyword, userId, userGroupIds, safeSort, safeDirection, categoryId, groupIds, safeStatus, limit, 0);
   }
 
   @Transactional(readOnly = true)
@@ -87,9 +95,9 @@ public class TodoService {
     if (ids == null || ids.isEmpty()) {
       return List.of();
     }
+    AppUser user = resolveUser(userId);
     List<Todo> todos = todoRepository.findAllById(ids);
-    todos.removeIf(todo -> todo.getDeletedAt() != null
-        || todo.getUser() == null || !userIdEquals(todo, userId));
+    todos.removeIf(todo -> todo.getDeletedAt() != null || !canAccess(todo, user));
     todos.sort((a, b) -> {
       if (a.getCreatedAt() == null && b.getCreatedAt() == null) {
         return 0;
@@ -144,6 +152,9 @@ public class TodoService {
   @Transactional(rollbackFor = Exception.class, noRollbackFor = BusinessException.class)
   @Auditable(action = "TODO_CREATE", targetType = "Todo")
   public Todo create(long userId, TodoForm form) {
+    if (isDuplicateSubmission(userId, form)) {
+      throw new DuplicateSubmissionException("duplicate");
+    }
     AppUser user = resolveUser(userId);
     form.setAuthor(user.getUsername());
     Todo todo = toEntity(userId, form);
@@ -224,7 +235,7 @@ public class TodoService {
         .priority(form.getPriority() != null ? form.getPriority() : Priority.MEDIUM)
         .category(resolveCategory(form.getCategoryId()))
         .user(resolveUser(userId))
-        .groups(resolveGroups(form.getGroupIds()))
+        .groups(resolveGroupsForUser(form.getGroupIds(), userId))
         .status(form.getStatus())
         .build();
   }
@@ -249,6 +260,57 @@ public class TodoService {
     }
     java.util.List<Group> groups = groupRepository.findAllById(groupIds);
     return new java.util.HashSet<>(groups);
+  }
+
+  private java.util.Set<Group> resolveGroupsForUser(java.util.List<Long> groupIds, long userId) {
+    if (groupIds == null || groupIds.isEmpty()) {
+      AppUser user = resolveUser(userId);
+      if (user.getDefaultGroups() != null && !user.getDefaultGroups().isEmpty()) {
+        return new java.util.HashSet<>(user.getDefaultGroups());
+      }
+    }
+    return resolveGroups(groupIds);
+  }
+
+  private List<Long> resolveUserGroupIds(long userId) {
+    AppUser user = resolveUser(userId);
+    if (user.getDefaultGroups() == null || user.getDefaultGroups().isEmpty()) {
+      return List.of();
+    }
+    return user.getDefaultGroups().stream()
+        .filter(g -> g != null && g.getId() != null)
+        .map(Group::getId)
+        .toList();
+  }
+
+  private boolean canAccess(Todo todo, AppUser user) {
+    if (todo == null || user == null) {
+      return false;
+    }
+    if (todo.getUser() != null && todo.getUser().getId() != null
+        && todo.getUser().getId().longValue() == user.getId().longValue()) {
+      return true;
+    }
+    if (todo.getGroups() == null || todo.getGroups().isEmpty()) {
+      return false;
+    }
+    if (user.getDefaultGroups() == null || user.getDefaultGroups().isEmpty()) {
+      return false;
+    }
+    for (Group todoGroup : todo.getGroups()) {
+      if (todoGroup == null || todoGroup.getId() == null) {
+        continue;
+      }
+      for (Group userGroup : user.getDefaultGroups()) {
+        if (userGroup == null || userGroup.getId() == null) {
+          continue;
+        }
+        if (todoGroup.getId().longValue() == userGroup.getId().longValue()) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private List<Long> resolveGroupFilterIds(Long groupId) {
@@ -311,4 +373,51 @@ public class TodoService {
     return todo.getUser() != null && todo.getUser().getId() != null
         && todo.getUser().getId().longValue() == userId;
   }
+
+  private boolean isDuplicateSubmission(long userId, TodoForm form) {
+    long now = System.currentTimeMillis();
+    int hash = submissionHash(form);
+    RecentSubmission previous = recentSubmissions.get(userId);
+    if (previous != null && previous.hash == hash && (now - previous.timestamp) <= DUPLICATE_WINDOW_MS) {
+      return true;
+    }
+    recentSubmissions.put(userId, new RecentSubmission(hash, now));
+    return false;
+  }
+
+  private int submissionHash(TodoForm form) {
+    String title = normalize(form.getTitle());
+    String detail = normalize(form.getDetail());
+    List<Long> groupIds = form.getGroupIds() == null ? new ArrayList<>() : new ArrayList<>(form.getGroupIds());
+    Collections.sort(groupIds);
+    List<String> attachments = form.getAttachmentStoredFilenames() == null
+        ? new ArrayList<>()
+        : new ArrayList<>(form.getAttachmentStoredFilenames());
+    Collections.sort(attachments);
+    return Objects.hash(
+        title,
+        detail,
+        form.getDueDate(),
+        form.getPriority(),
+        form.getStatus(),
+        form.getCategoryId(),
+        groupIds,
+        attachments
+    );
+  }
+
+  private String normalize(String value) {
+    return value == null ? "" : value.trim();
+  }
+
+  private static final class RecentSubmission {
+    private final int hash;
+    private final long timestamp;
+
+    private RecentSubmission(int hash, long timestamp) {
+      this.hash = hash;
+      this.timestamp = timestamp;
+    }
+  }
 }
+

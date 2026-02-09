@@ -1,4 +1,4 @@
-package com.example.todo;
+﻿package com.example.todo;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -183,7 +183,7 @@ public class TodoController {
     }
 
     StringBuilder csv = new StringBuilder();
-    csv.append("ID,タイトル,登録者,ステータス,作成日\r\n");
+    csv.append("ID,繧ｿ繧､繝医Ν,逋ｻ骭ｲ閠・繧ｹ繝・・繧ｿ繧ｹ,菴懈・譌･\r\n");
     DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy/MM/dd");
     for (Todo todo : todos) {
       csv.append(csvCell(todo.getId() == null ? "" : String.valueOf(todo.getId()))).append(",");
@@ -227,6 +227,19 @@ public class TodoController {
       @AuthenticationPrincipal UserDetails userDetails) {
     if (userDetails != null && (form.getAuthor() == null || form.getAuthor().isBlank())) {
       form.setAuthor(userDetails.getUsername());
+    }
+    if (userDetails != null && (form.getGroupIds() == null || form.getGroupIds().isEmpty())) {
+      appUserRepository.findByUsername(userDetails.getUsername())
+          .map(AppUser::getDefaultGroups)
+          .ifPresent(groups -> {
+            if (groups == null || groups.isEmpty()) {
+              return;
+            }
+            form.setGroupIds(groups.stream()
+                .filter(g -> g != null && g.getId() != null)
+                .map(Group::getId)
+                .toList());
+          });
     }
     if (form.getDueDate() == null) {
       form.setDueDate(java.time.LocalDate.now().plusWeeks(1));
@@ -283,11 +296,16 @@ public class TodoController {
       @AuthenticationPrincipal UserDetails userDetails,
       SessionStatus sessionStatus) {
     long userId = requireUserId(userDetails);
-    Todo created = todoService.create(userId, form);
-    todoAttachmentService.attachStoredList(created, form);
-    redirectAttributes.addFlashAttribute("successMessage", msg("msg.success_saved"));
-    sessionStatus.setComplete();
-    return "redirect:/todos";
+    try {
+      Todo created = todoService.create(userId, form);
+      todoAttachmentService.attachStoredList(created, form);
+      redirectAttributes.addFlashAttribute("successMessage", msg("msg.success_saved"));
+      sessionStatus.setComplete();
+      return "redirect:/todos";
+    } catch (DuplicateSubmissionException ex) {
+      redirectAttributes.addFlashAttribute("errorMessage", msg("msg.duplicate_submit"));
+      return "redirect:/todos/new";
+    }
   }
 
   @GetMapping("/{id:\\d+}")
@@ -298,7 +316,7 @@ public class TodoController {
     if (todo == null) {
       throw new TodoNotFoundException(msg("msg.not_found"));
     }
-    ensureOwner(todo, requireUserId(userDetails));
+    ensureCanAccess(todo, requireUserId(userDetails));
     model.addAttribute("attachments", todoAttachmentService.findByTodoId(todo.getId()));
     model.addAttribute("todo", todo);
     return "todo/detail";
@@ -309,7 +327,7 @@ public class TodoController {
       @AuthenticationPrincipal UserDetails userDetails) {
     Todo todo = todoService.findById(id)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-    ensureOwner(todo, requireUserId(userDetails));
+    ensureCanAccess(todo, requireUserId(userDetails));
     model.addAttribute("attachments", todoAttachmentService.findByTodoId(todo.getId()));
     model.addAttribute("todoForm", todoService.toForm(todo));
     return "todo/edit";
@@ -331,7 +349,7 @@ public class TodoController {
     try {
       Todo existing = todoService.findById(id)
           .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-      ensureOwner(existing, requireUserId(userDetails));
+      ensureCanAccess(existing, requireUserId(userDetails));
       todoService.update(id, form);
       if (files != null) {
         for (MultipartFile file : files) {
@@ -384,7 +402,7 @@ public class TodoController {
       @AuthenticationPrincipal UserDetails userDetails) {
     Todo todo = todoService.findById(id)
         .orElseThrow(() -> new TodoNotFoundException(msg("msg.not_found")));
-    ensureOwner(todo, requireUserId(userDetails));
+    ensureCanAccess(todo, requireUserId(userDetails));
     if (file == null || file.isEmpty()) {
       redirectAttributes.addFlashAttribute("errorMessage", msg("msg.file_select"));
       if ("edit".equalsIgnoreCase(redirect)) {
@@ -422,7 +440,7 @@ public class TodoController {
       @AuthenticationPrincipal UserDetails userDetails) {
     Todo todo = todoService.findById(todoId)
         .orElseThrow(() -> new TodoNotFoundException(msg("msg.not_found")));
-    ensureOwner(todo, requireUserId(userDetails));
+    ensureCanAccess(todo, requireUserId(userDetails));
     TodoAttachment attachment = todoAttachmentService.findById(attachmentId);
     if (attachment == null || attachment.getTodo() == null
         || !attachment.getTodo().getId().equals(todoId)) {
@@ -500,7 +518,7 @@ public class TodoController {
       @AuthenticationPrincipal UserDetails userDetails) {
     Todo todo = todoService.findById(todoId)
         .orElseThrow(() -> new TodoNotFoundException(msg("msg.not_found")));
-    ensureOwner(todo, requireUserId(userDetails));
+    ensureCanAccess(todo, requireUserId(userDetails));
     TodoAttachment attachment = todoAttachmentService.findById(attachmentId);
     if (attachment == null || attachment.getTodo() == null
         || !attachment.getTodo().getId().equals(todoId)) {
@@ -539,12 +557,12 @@ public class TodoController {
     try {
       Todo existing = todoService.findById(id)
           .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-      ensureOwner(existing, requireUserId(userDetails));
+      ensureCanAccess(existing, requireUserId(userDetails));
       if (!Boolean.TRUE.equals(existing.getCompleted())) {
         if (ajax) {
           return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "not_allowed"));
         }
-        redirectAttributes.addFlashAttribute("errorMessage", "未完了から完了への変更はできません。");
+        redirectAttributes.addFlashAttribute("errorMessage", "譛ｪ螳御ｺ・°繧牙ｮ御ｺ・∈縺ｮ螟画峩縺ｯ縺ｧ縺阪∪縺帙ｓ縲・);
         return "redirect:/todos";
       }
       boolean completed = todoService.toggleCompleted(id);
@@ -584,11 +602,42 @@ public class TodoController {
     }
   }
 
+  private void ensureCanAccess(Todo todo, long userId) {
+    if (todo.getUser() != null && todo.getUser().getId() != null
+        && todo.getUser().getId().longValue() == userId) {
+      return;
+    }
+    AppUser user = appUserRepository.findById(userId).orElse(null);
+    if (user == null) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+    }
+    if (user.getDefaultGroups() == null || user.getDefaultGroups().isEmpty()) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+    }
+    if (todo.getGroups() == null || todo.getGroups().isEmpty()) {
+      throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+    }
+    for (Group userGroup : user.getDefaultGroups()) {
+      if (userGroup == null || userGroup.getId() == null) {
+        continue;
+      }
+      for (Group todoGroup : todo.getGroups()) {
+        if (todoGroup == null || todoGroup.getId() == null) {
+          continue;
+        }
+        if (todoGroup.getId().longValue() == userGroup.getId().longValue()) {
+          return;
+        }
+      }
+    }
+    throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+  }
+
   private ResponseEntity<Resource> attachmentResource(long todoId, long attachmentId,
       boolean download, UserDetails userDetails) {
     Todo todo = todoService.findById(todoId)
         .orElseThrow(() -> new TodoNotFoundException(msg("msg.not_found")));
-    ensureOwner(todo, requireUserId(userDetails));
+    ensureCanAccess(todo, requireUserId(userDetails));
     TodoAttachment attachment = todoAttachmentService.findById(attachmentId);
     if (attachment == null || attachment.getTodo() == null
         || !attachment.getTodo().getId().equals(todoId)) {
@@ -611,3 +660,12 @@ public class TodoController {
         .body(resource);
   }
 }
+
+
+
+
+
+
+
+
+

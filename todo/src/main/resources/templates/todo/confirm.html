@@ -110,7 +110,7 @@
               <input type="hidden" th:each="v : ${todoForm.attachmentSizes}" th:name="attachmentSizes" th:value="${v}" />
               <button class="btn btn-outline-secondary" type="submit" th:text="#{btn.back}">Back</button>
             </form>
-            <form th:action="@{/todos/complete}" th:object="${todoForm}" method="post">
+            <form th:action="@{/todos/complete}" th:object="${todoForm}" method="post" data-disable-on-submit="true">
               <input type="hidden" th:field="*{author}" />
               <input type="hidden" th:field="*{title}" />
               <input type="hidden" th:field="*{detail}" />
@@ -239,6 +239,18 @@
           item.addEventListener("click", (event) => {
             event.preventDefault();
             alert("このページでは言語変換ができません。");
+          });
+        });
+      })();
+    </script>
+    <script>
+      (() => {
+        const form = document.querySelector("form[data-disable-on-submit='true']");
+        if (!form) return;
+        form.addEventListener("submit", () => {
+          const buttons = form.querySelectorAll("button[type='submit']");
+          buttons.forEach((btn) => {
+            btn.disabled = true;
           });
         });
       })();

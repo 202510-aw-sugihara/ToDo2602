@@ -9,6 +9,7 @@ public interface TodoMapper {
 
   List<Todo> search(@Param("keyword") String keyword,
       @Param("userId") Long userId,
+      @Param("userGroupIds") List<Long> userGroupIds,
       @Param("sort") String sort,
       @Param("direction") String direction,
       @Param("categoryId") Long categoryId,
@@ -19,6 +20,7 @@ public interface TodoMapper {
 
   long count(@Param("keyword") String keyword,
       @Param("userId") Long userId,
+      @Param("userGroupIds") List<Long> userGroupIds,
       @Param("categoryId") Long categoryId,
       @Param("groupIds") List<Long> groupIds,
       @Param("status") TodoStatus status);
